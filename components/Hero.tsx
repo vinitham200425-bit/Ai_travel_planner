@@ -1,6 +1,10 @@
 export default function Hero() {
   return (
-<section className="h-[500px] flex flex-col justify-center items-center bg-gradient-to-b from-blue-50 to-white px-6 pt-20">      <h1 className="text-5xl font-bold text-blue-700">
+    <section
+      id="home"
+      className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-b from-blue-50 to-white"
+    >
+      <h1 className="text-6xl font-bold text-blue-600">
         AI Travel Planner ✈️
       </h1>
 
@@ -8,7 +12,7 @@ export default function Hero() {
         Plan your dream vacation in seconds using Artificial Intelligence.
       </p>
 
-      <button className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition">
+      <button className="mt-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-xl">
         Generate My Trip
       </button>
     </section>
