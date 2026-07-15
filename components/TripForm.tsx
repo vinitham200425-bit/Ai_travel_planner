@@ -22,36 +22,58 @@ export default function TripForm() {
   const [hotelCategory, setHotelCategory] = useState("3 Star");
 
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleGenerateTrip = () => {
+  const handleGenerateTrip = async () => {
     if (!destination || !budget || !days) {
       alert("Please fill all required fields.");
       return;
     }
 
-    const itinerary: string[] = [];
+    try {
+      setLoading(true);
 
-    for (let i = 1; i <= Number(days); i++) {
-      itinerary.push(
-        `Day ${i} - Explore ${destination}, Visit Tourist Attractions, Enjoy Local Food and Relax.`
-      );
+      const response = await fetch("/api/generate-trip", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          destination,
+          days,
+          budget,
+          travelers,
+          travelStyle,
+          hotelCategory,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to generate itinerary.");
+      }
+
+      setTrip({
+        destination,
+        days: Number(days),
+        budget,
+        travelers,
+        travelStyle,
+        hotelCategory,
+        itinerary: [data.itinerary],
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate itinerary. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setTrip({
-      destination,
-      days: Number(days),
-      budget,
-      travelers,
-      travelStyle,
-      hotelCategory,
-      itinerary,
-    });
   };
 
   return (
     <section id="trip-form" className="py-20 bg-gray-100">
       <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl p-10">
-
         <h2 className="text-4xl font-bold text-center text-blue-600 mb-3">
           ✈️ Plan Your Dream Trip
         </h2>
@@ -62,7 +84,6 @@ export default function TripForm() {
 
         <div className="grid md:grid-cols-2 gap-6">
 
-          {/* Destination */}
           <div>
             <label className="block mb-2 font-semibold text-gray-700">
               📍 Destination
@@ -77,7 +98,6 @@ export default function TripForm() {
             />
           </div>
 
-          {/* Budget */}
           <div>
             <label className="block mb-2 font-semibold text-gray-700">
               💰 Budget (₹)
@@ -92,7 +112,6 @@ export default function TripForm() {
             />
           </div>
 
-          {/* Days */}
           <div>
             <label className="block mb-2 font-semibold text-gray-700">
               📅 Number of Days
@@ -107,7 +126,6 @@ export default function TripForm() {
             />
           </div>
 
-          {/* Travelers */}
           <div>
             <label className="block mb-2 font-semibold text-gray-700">
               👨‍👩‍👧 Travelers
@@ -126,7 +144,6 @@ export default function TripForm() {
             </select>
           </div>
 
-          {/* Travel Style */}
           <div>
             <label className="block mb-2 font-semibold text-gray-700">
               🎒 Travel Style
@@ -145,7 +162,6 @@ export default function TripForm() {
             </select>
           </div>
 
-          {/* Hotel */}
           <div>
             <label className="block mb-2 font-semibold text-gray-700">
               🏨 Hotel Category
@@ -166,9 +182,10 @@ export default function TripForm() {
 
         <button
           onClick={handleGenerateTrip}
-          className="mt-10 w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl text-lg font-semibold transition duration-300"
+          disabled={loading}
+          className="mt-10 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-xl text-lg font-semibold transition duration-300"
         >
-          🚀 Generate AI Itinerary
+          {loading ? "Generating AI Itinerary..." : "🚀 Generate AI Itinerary"}
         </button>
 
       </div>
