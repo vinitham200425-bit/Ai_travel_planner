@@ -23,7 +23,7 @@ export default function Features() {
   ];
 
   return (
-    <section id="features" className="py-24 bg-gray-100">
+    <section id="features" className="py-20 bg-gray-100">
       <h2 className="text-4xl font-bold text-center text-blue-600 mb-12">
         Why Choose Us?
       </h2>
