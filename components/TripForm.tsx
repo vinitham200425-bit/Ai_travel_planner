@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 import TripResult from "./TripResult";
 
 type Trip = {
   destination: string;
   days: number;
-  budget: string;
-  travelers: string;
-  travelStyle: string;
-  hotelCategory: string;
-  itinerary: string[];
+ budget: string;
+ travelers: string;
+ travelStyle: string;
+ hotelCategory: string;
+ itinerary: string[];
 };
 
 export default function TripForm() {
@@ -20,13 +21,21 @@ export default function TripForm() {
   const [travelers, setTravelers] = useState("1");
   const [travelStyle, setTravelStyle] = useState("Relax");
   const [hotelCategory, setHotelCategory] = useState("3 Star");
-
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleGenerateTrip = async () => {
     if (!destination || !budget || !days) {
       alert("Please fill all required fields.");
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Please login first.");
       return;
     }
 
@@ -39,6 +48,9 @@ export default function TripForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          userId: user.id,
+          userEmail: user.email,
+
           destination,
           days,
           budget,
@@ -65,7 +77,7 @@ export default function TripForm() {
       });
     } catch (error) {
       console.error(error);
-      alert("Failed to generate itinerary. Please try again.");
+      alert("Failed to generate itinerary.");
     } finally {
       setLoading(false);
     }
@@ -74,6 +86,7 @@ export default function TripForm() {
   return (
     <section id="trip-form" className="py-20 bg-gray-100">
       <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl p-10">
+
         <h2 className="text-4xl font-bold text-center text-blue-600 mb-3">
           ✈️ Plan Your Dream Trip
         </h2>
@@ -85,56 +98,48 @@ export default function TripForm() {
         <div className="grid md:grid-cols-2 gap-6">
 
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              📍 Destination
-            </label>
+            <label className="block mb-2 font-semibold">📍 Destination</label>
 
             <input
               type="text"
-              placeholder="e.g. Ooty"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. Ooty"
+              className="w-full border rounded-xl p-3"
             />
           </div>
 
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              💰 Budget (₹)
-            </label>
+            <label className="block mb-2 font-semibold">💰 Budget</label>
 
             <input
               type="number"
-              placeholder="e.g. 25000"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="25000"
+              className="w-full border rounded-xl p-3"
             />
           </div>
 
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              📅 Number of Days
-            </label>
+            <label className="block mb-2 font-semibold">📅 Days</label>
 
             <input
               type="number"
-              placeholder="e.g. 5"
               value={days}
               onChange={(e) => setDays(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="5"
+              className="w-full border rounded-xl p-3"
             />
           </div>
 
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              👨‍👩‍👧 Travelers
-            </label>
+            <label className="block mb-2 font-semibold">👨‍👩‍👧 Travelers</label>
 
             <select
               value={travelers}
               onChange={(e) => setTravelers(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-xl p-3"
             >
               <option>1</option>
               <option>2</option>
@@ -145,14 +150,12 @@ export default function TripForm() {
           </div>
 
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              🎒 Travel Style
-            </label>
+            <label className="block mb-2 font-semibold">🎒 Travel Style</label>
 
             <select
               value={travelStyle}
               onChange={(e) => setTravelStyle(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-xl p-3"
             >
               <option>Relax</option>
               <option>Adventure</option>
@@ -163,14 +166,12 @@ export default function TripForm() {
           </div>
 
           <div>
-            <label className="block mb-2 font-semibold text-gray-700">
-              🏨 Hotel Category
-            </label>
+            <label className="block mb-2 font-semibold">🏨 Hotel Category</label>
 
             <select
               value={hotelCategory}
               onChange={(e) => setHotelCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded-xl p-3"
             >
               <option>3 Star</option>
               <option>4 Star</option>
@@ -183,9 +184,9 @@ export default function TripForm() {
         <button
           onClick={handleGenerateTrip}
           disabled={loading}
-          className="mt-10 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-4 rounded-xl text-lg font-semibold transition duration-300"
+          className="mt-10 w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl"
         >
-          {loading ? "Generating AI Itinerary..." : "🚀 Generate AI Itinerary"}
+          {loading ? "Generating..." : "🚀 Generate AI Itinerary"}
         </button>
 
       </div>

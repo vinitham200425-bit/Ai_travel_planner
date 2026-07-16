@@ -1,44 +1,159 @@
 "use client";
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
 export default function Navbar() {
+  const router = useRouter();
+
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(Boolean(session));
+      setCheckingSession(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function checkSession() {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      setLoggedIn(Boolean(session));
+    } catch (error) {
+      console.error("Navbar Session Error:", error);
+      setLoggedIn(false);
+    } finally {
+      setCheckingSession(false);
+    }
+  }
+
+  async function handleLogout() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setLoggedIn(false);
+    router.push("/");
+    router.refresh();
+  }
+
   return (
-    <nav className="fixed top-0 left-0 w-full bg-white shadow-md z-50">
-      <div className="max-w-7xl mx-auto flex justify-between items-center px-8 py-4">
-
-        {/* Logo */}
-        <h1 className="text-3xl font-bold text-blue-600">
+    <nav className="fixed left-0 top-0 z-50 w-full bg-white shadow-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4">
+        <Link
+          href="/"
+          className="text-3xl font-bold text-blue-600"
+        >
           ✈️ AI Travel Planner
-        </h1>
+        </Link>
 
-        {/* Navigation */}
-        <div className="hidden md:flex items-center gap-8 text-lg">
-
-          <a href="#home" className="hover:text-blue-600">
+        <div className="hidden items-center gap-7 text-lg md:flex">
+          <Link
+            href="/"
+            className="transition hover:text-blue-600"
+          >
             Home
-          </a>
+          </Link>
 
-          <a href="#features" className="hover:text-blue-600">
+          <Link
+            href="/#features"
+            className="transition hover:text-blue-600"
+          >
             Features
-          </a>
+          </Link>
 
-          <a href="#pricing" className="hover:text-blue-600">
+          <Link
+            href="/#pricing"
+            className="transition hover:text-blue-600"
+          >
             Pricing
-          </a>
+          </Link>
 
-          <a href="#contact" className="hover:text-blue-600">
+          <Link
+            href="/#contact"
+            className="transition hover:text-blue-600"
+          >
             Contact
-          </a>
+          </Link>
 
+          {!checkingSession && loggedIn && (
+            <>
+              <Link
+                href="/dashboard"
+                className="transition hover:text-blue-600"
+              >
+                Dashboard
+              </Link>
+
+              <Link
+                href="/my-trips"
+                className="transition hover:text-blue-600"
+              >
+                My Trips
+              </Link>
+
+              <Link
+                href="/profile"
+                className="transition hover:text-blue-600"
+              >
+                Profile
+              </Link>
+            </>
+          )}
         </div>
 
-        {/* Button */}
-        <a
-          href="#trip-form"
-          className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition"
-        >
-          Generate Trip
-        </a>
+        <div className="flex items-center gap-3">
+          <Link
+            href={loggedIn ? "/#trip-form" : "/login"}
+            className="rounded-xl bg-blue-600 px-5 py-2 text-white transition hover:bg-blue-700"
+          >
+            Generate Trip
+          </Link>
 
+          {!checkingSession &&
+            (loggedIn ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-xl border border-red-500 px-5 py-2 text-red-500 transition hover:bg-red-500 hover:text-white"
+              >
+                Logout
+              </button>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="rounded-xl border border-blue-600 px-5 py-2 text-blue-600 transition hover:bg-blue-600 hover:text-white"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  href="/signup"
+                  className="rounded-xl bg-green-600 px-5 py-2 text-white transition hover:bg-green-700"
+                >
+                  Sign Up
+                </Link>
+              </>
+            ))}
+        </div>
       </div>
     </nav>
   );

@@ -9,14 +9,20 @@ datasource db {
 }
 
 model Trip {
-  id            String   @id @default(cuid())
-  destination   String
-  days          Int
-  budget        Int
+  id String @id @default(cuid())
+
+  userId    String
+  userEmail String
+
+  destination String
+  days        Int
+  budget      Int
+
   travelers     String
   travelStyle   String
   hotelCategory String
-  itinerary     String
 
-  createdAt     DateTime @default(now())
+  itinerary String
+
+  createdAt DateTime @default(now())
 }
