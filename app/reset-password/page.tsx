@@ -1,5 +1,6 @@
 "use client";
 
+import toast from "react-hot-toast";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -58,7 +59,7 @@ export default function ResetPasswordPage() {
         throw error;
       }
 
-      alert("Password updated successfully.");
+      toast.success("Password updated successfully.");
       router.push("/login");
       router.refresh();
     } catch (error) {

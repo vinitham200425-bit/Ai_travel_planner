@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
@@ -42,33 +43,38 @@ export default function Navbar() {
   }
 
   async function handleLogout() {
-    const { error } = await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
 
-    if (error) {
-      alert(error.message);
-      return;
+      if (error) {
+        throw error;
+      }
+
+      setLoggedIn(false);
+      toast.success("Logged out successfully.");
+
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout Error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to log out."
+      );
     }
-
-    setLoggedIn(false);
-    router.push("/");
-    router.refresh();
   }
 
   return (
     <nav className="fixed left-0 top-0 z-50 w-full bg-white shadow-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4">
-        <Link
-          href="/"
-          className="text-3xl font-bold text-blue-600"
-        >
+        <Link href="/" className="text-3xl font-bold text-blue-600">
           ✈️ AI Travel Planner
         </Link>
 
         <div className="hidden items-center gap-7 text-lg md:flex">
-          <Link
-            href="/"
-            className="transition hover:text-blue-600"
-          >
+          <Link href="/" className="transition hover:text-blue-600">
             Home
           </Link>
 

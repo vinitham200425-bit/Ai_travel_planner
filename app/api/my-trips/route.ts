@@ -1,22 +1,28 @@
 import { prisma } from "@/lib/prisma";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-export async function POST(request: Request) {
+export async function GET() {
   try {
-    const { userId } = await request.json();
+    const supabase = await createSupabaseServerClient();
 
-    if (!userId) {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user) {
       return Response.json(
         {
           success: false,
-          message: "User not found",
+          message: "You must be logged in.",
         },
-        { status: 400 }
+        { status: 401 }
       );
     }
 
     const trips = await prisma.trip.findMany({
       where: {
-        userId,
+        userId: user.id,
       },
       orderBy: {
         createdAt: "desc",
@@ -28,16 +34,14 @@ export async function POST(request: Request) {
       trips,
     });
   } catch (error) {
-    console.error(error);
+    console.error("MY TRIPS API ERROR:", error);
 
     return Response.json(
       {
         success: false,
-        message: "Unable to fetch trips.",
+        message: "Unable to load trips.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
