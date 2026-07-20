@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 type RouteContext = {
   params: Promise<{
@@ -8,24 +9,32 @@ type RouteContext = {
 
 export async function GET(
   _request: Request,
-  context: RouteContext
+  { params }: RouteContext
 ) {
   try {
-    const { id } = await context.params;
+    const { id } = await params;
 
-    if (!id) {
+    const supabase = await createSupabaseServerClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
       return Response.json(
         {
           success: false,
-          message: "Trip ID is required.",
+          message: "You must be logged in.",
         },
-        { status: 400 }
+        { status: 401 }
       );
     }
 
-    const trip = await prisma.trip.findUnique({
+    const trip = await prisma.trip.findFirst({
       where: {
         id,
+        userId: user.id,
       },
     });
 
@@ -44,12 +53,79 @@ export async function GET(
       trip,
     });
   } catch (error) {
-    console.error("GET TRIP ERROR:", error);
+    console.error("TRIP DETAILS API ERROR:", error);
 
     return Response.json(
       {
         success: false,
-        message: "Unable to load the trip.",
+        message: "Unable to load trip details.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: RouteContext
+) {
+  try {
+    const { id } = await params;
+
+    const supabase = await createSupabaseServerClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return Response.json(
+        {
+          success: false,
+          message: "You must be logged in.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const trip = await prisma.trip.findFirst({
+      where: {
+        id,
+        userId: user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!trip) {
+      return Response.json(
+        {
+          success: false,
+          message: "Trip not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    await prisma.trip.delete({
+      where: {
+        id: trip.id,
+      },
+    });
+
+    return Response.json({
+      success: true,
+      message: "Trip deleted successfully.",
+    });
+  } catch (error) {
+    console.error("DELETE TRIP API ERROR:", error);
+
+    return Response.json(
+      {
+        success: false,
+        message: "Unable to delete the trip.",
       },
       { status: 500 }
     );

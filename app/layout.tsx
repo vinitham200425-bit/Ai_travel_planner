@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
+
+import ThemeProvider from "@/components/ThemeProvider";
 import ToastProvider from "@/components/ToastProvider";
 
 export const metadata: Metadata = {
   title: "AI Travel Planner",
-  description: "Plan personalized trips using AI.",
+  description:
+    "Create personalized travel itineraries using artificial intelligence.",
 };
 
 export default function RootLayout({
@@ -13,10 +16,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-scroll-behavior="smooth">
-      <body>
-        <ToastProvider />
-        {children}
+    <html
+      lang="en"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+    >
+      <body className="min-h-screen bg-white text-gray-900 transition-colors dark:bg-gray-950 dark:text-gray-100">
+        <ThemeProvider>
+          <ToastProvider />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

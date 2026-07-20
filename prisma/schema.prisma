@@ -9,20 +9,20 @@ datasource db {
 }
 
 model Trip {
-  id String @id @default(cuid())
+  id            String   @id @default(cuid())
+  userId        String
+  userEmail     String
 
-  userId    String
-  userEmail String
-
-  destination String
-  days        Int
-  budget      Int
-
+  destination   String
+  days          Int
+  budget        Int
   travelers     String
   travelStyle   String
   hotelCategory String
+  itinerary     String
 
-  itinerary String
+  imageUrl      String?
+  isFavorite    Boolean  @default(false)
 
-  createdAt DateTime @default(now())
+  createdAt     DateTime @default(now())
 }

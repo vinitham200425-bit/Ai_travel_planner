@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -11,11 +12,8 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return Response.json(
-        {
-          success: false,
-          message: "You must be logged in.",
-        },
+      return NextResponse.json(
+        { error: "Unauthorized. Please log in." },
         { status: 401 }
       );
     }
@@ -35,25 +33,36 @@ export async function GET() {
         travelers: true,
         travelStyle: true,
         hotelCategory: true,
-        itinerary: true,
         createdAt: true,
       },
     });
 
-    return Response.json({
-      success: true,
-      trips,
+    const uniqueDestinations = new Set(
+      trips.map((trip) => trip.destination.trim().toLowerCase())
+    ).size;
+
+    const totalBudget = trips.reduce(
+      (total, trip) => total + trip.budget,
+      0
+    );
+
+    const latestTrip = trips.length > 0 ? trips[0] : null;
+
+    const recentTrips = trips.slice(0, 5);
+
+    return NextResponse.json({
+      totalTrips: trips.length,
+      uniqueDestinations,
+      totalBudget,
+      latestTrip,
+      recentTrips,
     });
   } catch (error) {
-    console.error("MY TRIPS API ERROR:", error);
+    console.error("Dashboard statistics error:", error);
 
-    return Response.json(
+    return NextResponse.json(
       {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to load trips.",
+        error: "Unable to load dashboard statistics.",
       },
       { status: 500 }
     );
