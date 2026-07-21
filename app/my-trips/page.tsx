@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CalendarDays,
   CircleDollarSign,
   Eye,
+  Heart,
   Hotel,
   LoaderCircle,
   MapPin,
@@ -19,6 +20,9 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
+const fallbackImage =
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80";
+
 type Trip = {
   id: string;
   destination: string;
@@ -29,9 +33,11 @@ type Trip = {
   hotelCategory: string;
   itinerary: string;
   createdAt: string;
-  imageUrl?: string;
-isFavorite: boolean;
+  imageUrl?: string | null;
+  isFavorite: boolean;
 };
+
+type TripFilter = "all" | "favorites";
 
 export default function MyTripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -39,10 +45,27 @@ export default function MyTripsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [filter, setFilter] = useState<TripFilter>("all");
+  const [updatingFavoriteId, setUpdatingFavoriteId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
-    loadTrips();
+    void loadTrips();
   }, []);
+
+  const favoriteCount = useMemo(
+    () => trips.filter((trip) => trip.isFavorite).length,
+    [trips]
+  );
+
+  const visibleTrips = useMemo(() => {
+    if (filter === "favorites") {
+      return trips.filter((trip) => trip.isFavorite);
+    }
+
+    return trips;
+  }, [filter, trips]);
 
   async function loadTrips() {
     try {
@@ -61,7 +84,14 @@ export default function MyTripsPage() {
         throw new Error(data.message || "Unable to fetch trips.");
       }
 
-      setTrips(Array.isArray(data.trips) ? data.trips : []);
+      const loadedTrips = Array.isArray(data.trips)
+        ? data.trips.map((trip: Trip) => ({
+            ...trip,
+            isFavorite: Boolean(trip.isFavorite),
+          }))
+        : [];
+
+      setTrips(loadedTrips);
     } catch (error) {
       console.error("My Trips Error:", error);
 
@@ -74,6 +104,64 @@ export default function MyTripsPage() {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleToggleFavorite(trip: Trip) {
+    if (updatingFavoriteId) {
+      return;
+    }
+
+    const newFavoriteStatus = !trip.isFavorite;
+
+    try {
+      setUpdatingFavoriteId(trip.id);
+
+      const response = await fetch(`/api/trips/${trip.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          isFavorite: newFavoriteStatus,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || "Unable to update favorite status."
+        );
+      }
+
+      setTrips((currentTrips) =>
+        currentTrips.map((currentTrip) =>
+          currentTrip.id === trip.id
+            ? {
+                ...currentTrip,
+                isFavorite: newFavoriteStatus,
+              }
+            : currentTrip
+        )
+      );
+
+      toast.success(
+        newFavoriteStatus
+          ? "Trip added to favorites."
+          : "Trip removed from favorites."
+      );
+    } catch (error) {
+      console.error("Favorite Trip Error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update favorite status."
+      );
+    } finally {
+      setUpdatingFavoriteId(null);
     }
   }
 
@@ -197,7 +285,7 @@ export default function MyTripsPage() {
 
               <button
                 type="button"
-                onClick={loadTrips}
+                onClick={() => void loadTrips()}
                 className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700"
               >
                 <RefreshCw size={18} />
@@ -233,110 +321,190 @@ export default function MyTripsPage() {
 
           {!errorMessage && trips.length > 0 && (
             <>
-              <div className="mb-6 flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {trips.length} saved{" "}
-                  {trips.length === 1 ? "trip" : "trips"}
-                </p>
+              <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFilter("all")}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                      filter === "all"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    All Trips ({trips.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilter("favorites")}
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                      filter === "favorites"
+                        ? "bg-rose-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <Heart
+                      size={16}
+                      fill={filter === "favorites" ? "currentColor" : "none"}
+                    />
+                    Favorites ({favoriteCount})
+                  </button>
+                </div>
 
                 <button
                   type="button"
-                  onClick={loadTrips}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                  onClick={() => void loadTrips()}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
                 >
                   <RefreshCw size={16} />
                   Refresh
                 </button>
               </div>
 
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {trips.map((trip) => (
-                  <article
-                    key={trip.id}
-                    className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900"
+              {filter === "favorites" && visibleTrips.length === 0 ? (
+                <section className="rounded-3xl border border-gray-100 bg-white p-10 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+                    <Heart size={32} />
+                  </span>
+
+                  <h2 className="mt-5 text-2xl font-bold text-gray-900 dark:text-white">
+                    No favorite trips
+                  </h2>
+
+                  <p className="mt-2 text-gray-500 dark:text-gray-400">
+                    Select the heart icon on a trip to save it as a favorite.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilter("all")}
+                    className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700"
                   >
-                    <div className="relative h-56 w-full">
-  {trips.map((trip, index) => (
-  <Image
-    src={trip.imageUrl || fallbackImage}
-    alt={trip.destination}
-    fill
-    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-    loading={index === 0 ? "eager" : "lazy"}
-    className="object-cover"
-  />
-))}
+                    View All Trips
+                  </button>
+                </section>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {visibleTrips.map((trip, index) => {
+                    const updatingFavorite =
+                      updatingFavoriteId === trip.id;
 
-  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                    return (
+                      <article
+                        key={trip.id}
+                        className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900"
+                      >
+                        <div className="relative h-56 w-full overflow-hidden">
+                          <Image
+                            src={trip.imageUrl || fallbackImage}
+                            alt={`Travel destination: ${trip.destination}`}
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                            loading={index === 0 ? "eager" : "lazy"}
+                            className="object-cover transition duration-500 hover:scale-105"
+                          />
 
-  <div className="absolute bottom-0 left-0 p-6 text-white">
-    <p className="flex items-center gap-2 text-sm text-blue-100">
-      <MapPin size={17} />
-      Saved Trip
-    </p>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
-    <h2 className="mt-2 text-3xl font-bold">
-      {trip.destination}
-    </h2>
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleFavorite(trip)}
+                            disabled={
+                              Boolean(updatingFavoriteId) &&
+                              !updatingFavorite
+                            }
+                            aria-label={
+                              trip.isFavorite
+                                ? `Remove ${trip.destination} from favorites`
+                                : `Add ${trip.destination} to favorites`
+                            }
+className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-md backdrop-blur transition hover:scale-110 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-900/90 dark:text-red-500 dark:hover:bg-gray-900"                          >
+                            {updatingFavorite ? (
+                              <LoaderCircle
+                                size={21}
+                                className="animate-spin"
+                              />
+                            ) : (
+                              <Heart
+  size={22}
+  className="text-red-500"
+  fill={trip.isFavorite ? "#ef4444" : "none"}
+  strokeWidth={2}
+/>
+                            )}
+                          </button>
 
-    <p className="mt-2 text-sm text-blue-100">
-      Created on {formatDate(trip.createdAt)}
-    </p>
-  </div>
-</div>
+                          <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                            <p className="flex items-center gap-2 text-sm text-blue-100">
+                              <MapPin size={17} />
+                              Saved trip
+                            </p>
 
-                    <div className="p-6">
-                      <div className="space-y-3 text-gray-700 dark:text-gray-300">
-                        <TripInfo
-                          icon={<CalendarDays size={19} />}
-                          text={`${trip.days} ${
-                            trip.days === 1 ? "day" : "days"
-                          }`}
-                        />
+                            <h2 className="mt-2 break-words text-3xl font-bold">
+                              {trip.destination}
+                            </h2>
 
-                        <TripInfo
-                          icon={<CircleDollarSign size={19} />}
-                          text={formatCurrency(trip.budget)}
-                        />
+                            <p className="mt-2 text-sm text-blue-100">
+                              Created on {formatDate(trip.createdAt)}
+                            </p>
+                          </div>
+                        </div>
 
-                        <TripInfo
-                          icon={<Users size={19} />}
-                          text={`${trip.travelers} traveler(s)`}
-                        />
+                        <div className="p-6">
+                          <div className="space-y-3 text-gray-700 dark:text-gray-300">
+                            <TripInfo
+                              icon={<CalendarDays size={19} />}
+                              text={`${trip.days} ${
+                                trip.days === 1 ? "day" : "days"
+                              }`}
+                            />
 
-                        <TripInfo
-                          icon={<Route size={19} />}
-                          text={trip.travelStyle}
-                        />
+                            <TripInfo
+                              icon={<CircleDollarSign size={19} />}
+                              text={formatCurrency(trip.budget)}
+                            />
 
-                        <TripInfo
-                          icon={<Hotel size={19} />}
-                          text={trip.hotelCategory}
-                        />
-                      </div>
+                            <TripInfo
+                              icon={<Users size={19} />}
+                              text={`${trip.travelers} traveler(s)`}
+                            />
 
-                      <div className="mt-6 grid grid-cols-2 gap-3">
-                        <Link
-                          href={`/trips/${trip.id}`}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700"
-                        >
-                          <Eye size={18} />
-                          View Trip
-                        </Link>
+                            <TripInfo
+                              icon={<Route size={19} />}
+                              text={trip.travelStyle}
+                            />
 
-                        <button
-                          type="button"
-                          onClick={() => setTripToDelete(trip)}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500 px-4 py-3 font-semibold text-red-600 transition hover:bg-red-500 hover:text-white dark:border-red-500 dark:text-red-400 dark:hover:text-white"
-                        >
-                          <Trash2 size={18} />
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                            <TripInfo
+                              icon={<Hotel size={19} />}
+                              text={trip.hotelCategory}
+                            />
+                          </div>
+
+                          <div className="mt-6 grid grid-cols-2 gap-3">
+                            <Link
+                              href={`/trips/${trip.id}`}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700"
+                            >
+                              <Eye size={18} />
+                              View Trip
+                            </Link>
+
+                            <button
+                              type="button"
+                              onClick={() => setTripToDelete(trip)}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500 px-4 py-3 font-semibold text-red-600 transition hover:bg-red-500 hover:text-white dark:border-red-500 dark:text-red-400 dark:hover:text-white"
+                            >
+                              <Trash2 size={18} />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -404,7 +572,7 @@ export default function MyTripsPage() {
 
               <button
                 type="button"
-                onClick={handleDeleteTrip}
+                onClick={() => void handleDeleteTrip()}
                 disabled={deleting}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-400"
               >

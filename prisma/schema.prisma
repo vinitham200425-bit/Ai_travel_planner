@@ -12,17 +12,15 @@ model Trip {
   id            String   @id @default(cuid())
   userId        String
   userEmail     String
-
   destination   String
+  country String @default("India")
   days          Int
   budget        Int
   travelers     String
   travelStyle   String
   hotelCategory String
   itinerary     String
-
   imageUrl      String?
   isFavorite    Boolean  @default(false)
-
   createdAt     DateTime @default(now())
 }
