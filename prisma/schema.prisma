@@ -9,18 +9,41 @@ datasource db {
 }
 
 model Trip {
-  id            String   @id @default(cuid())
-  userId        String
-  userEmail     String
-  destination   String
-  country String @default("India")
-  days          Int
-  budget        Int
+  id        String @id @default(cuid())
+  userId    String
+  userEmail String
+
+  destination String
+  country     String @default("India")
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  days   Int
+  budget Int
+
   travelers     String
   travelStyle   String
   hotelCategory String
-  itinerary     String
-  imageUrl      String?
-  isFavorite    Boolean  @default(false)
-  createdAt     DateTime @default(now())
+
+  itinerary String
+
+  imageUrl String?
+
+  isFavorite Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
 }

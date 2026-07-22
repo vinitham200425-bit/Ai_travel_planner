@@ -28,6 +28,9 @@ type GenerateTripBody = {
   travelers?: string;
   travelStyle?: string;
   hotelCategory?: string;
+  startDate?: string;
+  endDate?: string;
+weatherForecast?: any[];
 };
 
 async function getDestinationImage(
@@ -75,12 +78,14 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as GenerateTripBody;
 
-    const userId = body.userId?.trim();
-    const userEmail = body.userEmail?.trim();
-    const country = body.country?.trim();
-    const travelers = body.travelers?.trim();
-    const travelStyle = body.travelStyle?.trim();
-    const hotelCategory = body.hotelCategory?.trim();
+    const userId = body.userId?.trim() ?? "";
+    const userEmail = body.userEmail?.trim() ?? "";
+    const country = body.country?.trim() ?? "";
+    const travelers = body.travelers?.trim() ?? "";
+    const travelStyle = body.travelStyle?.trim() ?? "";
+    const hotelCategory = body.hotelCategory?.trim() ?? "";
+    const startDate = body.startDate?.trim() ?? "";
+    const endDate = body.endDate?.trim() ?? "";
 
     const destinations =
       body.destinations
@@ -113,7 +118,9 @@ export async function POST(request: Request) {
       body.budget === undefined ||
       !travelers ||
       !travelStyle ||
-      !hotelCategory
+      !hotelCategory ||
+      !startDate ||
+      !endDate
     ) {
       return Response.json(
         {
@@ -176,7 +183,23 @@ Total budget: ₹${parsedBudget}
 Travelers: ${travelers}
 Travel style: ${travelStyle}
 Hotel category: ${hotelCategory}
+Travel Dates:
+${startDate} to ${endDate}
 
+Expected Weather:
+${body.weatherForecast
+  ?.map(
+    (day) =>
+      `${day.date} - ${day.condition}, ${day.minimumTemperature}°C to ${day.maximumTemperature}°C`
+  )
+  .join("\n") ?? "Not Available"}
+
+Weather Instructions:
+
+- Plan outdoor sightseeing on pleasant weather days.
+- Use indoor attractions on rainy days.
+- Mention if an umbrella or jacket is recommended.
+- Include weather precautions naturally inside the itinerary.
 Requirements:
 
 1. Arrange the selected destinations in the most practical travel order.
@@ -221,21 +244,28 @@ Return the response in clean, beautiful markdown.
       Multiple destination names are stored in the current destination String field.
     */
     const savedTrip = await prisma.trip.create({
-      data: {
-        userId,
-        userEmail,
-        destination: destinationNames,
-        country,
-        days: parsedDays,
-        budget: parsedBudget,
-        travelers,
-        travelStyle,
-        hotelCategory,
-        itinerary,
-        imageUrl,
-        isFavorite: false,
-      },
-    });
+  data: {
+    userId,
+    userEmail,
+    destination: destinationNames,
+    country,
+
+    startDate: new Date(startDate),
+    endDate: new Date(endDate),
+
+    days: parsedDays,
+    budget: parsedBudget,
+
+    travelers,
+    travelStyle,
+    hotelCategory,
+
+    itinerary,
+    imageUrl,
+
+    isFavorite: false,
+  },
+});
 
     return Response.json({
       success: true,
