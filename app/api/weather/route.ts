@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
       daily:
         "sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
       timezone: "auto",
-      forecast_days: "1",
+      
     });
 
     const weatherResponse = await fetch(

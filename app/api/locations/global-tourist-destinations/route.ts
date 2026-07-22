@@ -79,7 +79,7 @@ async function runSparql(query: string): Promise<SparqlBinding[]> {
       headers: {
         Accept: "application/sparql-results+json",
         "User-Agent":
-          "AITravelPlanner/1.0 (contact: your-email@example.com)",
+          "AITravelPlanner/1.0 (contact: vinitham200425@gmail.com)",
       },
       next: { revalidate: 86400 },
     }
