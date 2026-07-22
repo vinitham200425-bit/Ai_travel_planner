@@ -90,14 +90,21 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Contact form error:", error);
+  console.error("Contact form error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          "Unable to send your message right now. Please try again.",
-      },
-      { status: 500 }
-    );
-  }
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : "Unknown contact form error";
+
+  return NextResponse.json(
+    {
+      error:
+        process.env.NODE_ENV === "development"
+          ? errorMessage
+          : "Unable to send your message right now. Please try again.",
+    },
+    { status: 500 }
+  );
+}
 }
