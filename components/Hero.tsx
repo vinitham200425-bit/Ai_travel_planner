@@ -17,13 +17,13 @@ export default function Hero() {
       className="relative isolate flex min-h-[720px] scroll-mt-20 items-center overflow-hidden pt-20"
     >
       <Image
-        src="/images/hero-banner.png"
-        alt="Beautiful travel destination"
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover object-center"
-      />
+  src="/images/travel-collage-v2.png"
+  alt="Collage of famous travel destinations around the world"
+  fill
+  priority
+  sizes="100vw"
+  className="object-cover object-center"
+/>
 
       <div className="absolute inset-0 bg-gradient-to-r from-gray-950/90 via-gray-950/65 to-gray-950/25" />
 

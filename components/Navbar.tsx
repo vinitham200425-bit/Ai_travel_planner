@@ -42,9 +42,12 @@ export default function Navbar() {
           error,
         } = await supabase.auth.getUser();
 
-        if (error) {
-          console.error("Unable to load user:", error.message);
-        }
+        if (
+  error &&
+  error.message !== "Auth session missing!"
+) {
+  console.error("Unable to load user:", error.message);
+}
 
         if (active) {
           setUser(currentUser ?? null);

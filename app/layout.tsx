@@ -55,7 +55,7 @@ export const metadata: Metadata = {
       "Generate personalized day-wise travel itineraries based on your destination, dates, budget, preferences and weather.",
     images: [
       {
-        url: "/images/hero-banner.png",
+        url: "/images/travel-collage.png",
         alt: "AI Travel Planner",
       },
     ],
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
     title: "AI Travel Planner | Plan Smarter, Travel Better",
     description:
       "Create personalized AI-powered travel itineraries in minutes.",
-    images: ["/images/hero-banner.png"],
+    images: ["/images/travel-collage.png"],
   },
 
   robots: {
