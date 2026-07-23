@@ -53,7 +53,7 @@ export default function Footer() {
                 size={18}
                 className="mt-0.5 shrink-0 text-blue-400"
               />
-              support@aitravelplanner.com
+              supportaitravelplanner@gmail.com
             </p>
 
             <p className="flex items-start gap-3">

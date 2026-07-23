@@ -127,7 +127,7 @@ export default function Contact() {
               <ContactDetail
                 icon={<Mail size={22} />}
                 title="Email"
-                value="support@aitravelplanner.com"
+                value="supportaitravelplanner@gmail.com"
               />
 
               <ContactDetail
