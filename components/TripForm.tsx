@@ -1,5 +1,3 @@
-"use client";
-
 import {
   useCallback,
   useEffect,
@@ -113,15 +111,8 @@ export default function TripForm() {
 
   const primaryDestination = selectedPlaces[0] ?? null;
 
-  useEffect(() => {
-    void loadCurrentUser();
-    void loadCountries();
-  }, []);
-
-  async function loadCurrentUser() {
+  const loadCurrentUser = useCallback(async () => {
     try {
-      setAuthLoading(true);
-
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -140,12 +131,10 @@ export default function TripForm() {
     } finally {
       setAuthLoading(false);
     }
-  }
+  }, []);
 
-  async function loadCountries() {
+  const loadCountries = useCallback(async () => {
     try {
-      setCountriesLoading(true);
-
       const response = await fetch(
         "/api/locations/countries",
         {
@@ -153,7 +142,11 @@ export default function TripForm() {
         }
       );
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        success: boolean;
+        countries?: CountryOption[];
+        message?: string;
+      };
 
       if (!response.ok || !data.success) {
         throw new Error(
@@ -171,7 +164,16 @@ export default function TripForm() {
     } finally {
       setCountriesLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    void loadCurrentUser();
+    void loadCountries();
+  }, 0);
+
+  return () => clearTimeout(timer);
+}, [loadCurrentUser, loadCountries]);
 
   const handleWeatherForecastChange = useCallback(
     (forecast: WeatherForecastDay[]) => {
@@ -288,7 +290,11 @@ export default function TripForm() {
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        success: boolean;
+        itinerary?: string;
+        message?: string;
+      };
 
       if (!response.ok || !data.success) {
         throw new Error(
@@ -306,7 +312,7 @@ export default function TripForm() {
         travelers,
         travelStyle,
         hotelCategory,
-        itinerary: [data.itinerary],
+        itinerary: [data.itinerary ?? ""],
       });
 
       toast.success(

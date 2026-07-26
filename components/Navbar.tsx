@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import {
   ChevronDown,
@@ -14,11 +12,19 @@ import {
   UserCircle,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import toast from "react-hot-toast";
 
-import { supabase } from "@/lib/supabase";
 import ThemeToggle from "@/components/ThemeToggle";
+import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
   const router = useRouter();
@@ -32,6 +38,55 @@ export default function Navbar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  const closeMenus = useCallback(() => {
+    setMobileMenuOpen(false);
+    setProfileMenuOpen(false);
+  }, []);
+
+  const goToLogin = useCallback(() => {
+    closeMenus();
+    router.push("/login");
+  }, [closeMenus, router]);
+
+  const goToSignup = useCallback(() => {
+    closeMenus();
+    router.push("/signup");
+  }, [closeMenus, router]);
+
+  const handleLogout = useCallback(async () => {
+    if (loggingOut) {
+      return;
+    }
+
+    try {
+      setLoggingOut(true);
+
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+
+      setUser(null);
+      closeMenus();
+
+      toast.success("Logged out successfully.");
+
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to log out."
+      );
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [closeMenus, loggingOut, router]);
+
   useEffect(() => {
     let active = true;
 
@@ -43,11 +98,14 @@ export default function Navbar() {
         } = await supabase.auth.getUser();
 
         if (
-  error &&
-  error.message !== "Auth session missing!"
-) {
-  console.error("Unable to load user:", error.message);
-}
+          error &&
+          error.message !== "Auth session missing!"
+        ) {
+          console.error(
+            "Unable to load user:",
+            error.message
+          );
+        }
 
         if (active) {
           setUser(currentUser ?? null);
@@ -65,16 +123,18 @@ export default function Navbar() {
       }
     }
 
-    loadUser();
+    void loadUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (active) {
-        setUser(session?.user ?? null);
-        setAuthLoading(false);
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (active) {
+          setUser(session?.user ?? null);
+          setAuthLoading(false);
+        }
       }
-    });
+    );
 
     return () => {
       active = false;
@@ -86,73 +146,51 @@ export default function Navbar() {
     function handleOutsideClick(event: MouseEvent) {
       if (
         profileMenuRef.current &&
-        !profileMenuRef.current.contains(event.target as Node)
+        !profileMenuRef.current.contains(
+          event.target as Node
+        )
       ) {
         setProfileMenuOpen(false);
       }
     }
 
-    document.addEventListener("mousedown", handleOutsideClick);
+    function handleEscapeKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+        setMobileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+    document.addEventListener(
+      "keydown",
+      handleEscapeKey
+    );
 
     return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+      document.removeEventListener(
+        "keydown",
+        handleEscapeKey
+      );
     };
   }, []);
 
   useEffect(() => {
-    setMobileMenuOpen(false);
-    setProfileMenuOpen(false);
-  }, [pathname]);
+    const timer = window.setTimeout(() => {
+      closeMenus();
+    }, 0);
 
-  async function handleLogout() {
-    if (loggingOut) {
-      return;
-    }
-
-    try {
-      setLoggingOut(true);
-
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        throw error;
-      }
-
-      setUser(null);
-      setProfileMenuOpen(false);
-      setMobileMenuOpen(false);
-
-      toast.success("Logged out successfully.");
-
-      router.push("/");
-      router.refresh();
-    } catch (error) {
-      console.error("Logout error:", error);
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to log out."
-      );
-    } finally {
-      setLoggingOut(false);
-    }
-  }
-
-  function closeMenus() {
-    setMobileMenuOpen(false);
-    setProfileMenuOpen(false);
-  }
-
-  function goToLogin() {
-    closeMenus();
-    router.push("/login");
-  }
-
-  function goToSignup() {
-    closeMenus();
-    router.push("/signup");
-  }
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [closeMenus, pathname]);
 
   const userEmail = user?.email ?? "";
 
@@ -162,18 +200,23 @@ export default function Navbar() {
     userEmail.split("@")[0] ||
     "Traveller";
 
-  const avatarLetter = displayName.charAt(0).toUpperCase();
+  const avatarLetter =
+    displayName.charAt(0).toUpperCase() || "T";
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/90 shadow-sm backdrop-blur-xl transition-colors dark:border-gray-800 dark:bg-gray-950/90">
-      <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <nav
+        aria-label="Primary navigation"
+        className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
+      >
         <Link
           href="/"
           onClick={closeMenus}
           className="flex items-center gap-3"
+          aria-label="AI Travel Planner home"
         >
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md">
-            <Plane size={23} />
+            <Plane size={23} aria-hidden="true" />
           </span>
 
           <div>
@@ -195,8 +238,12 @@ export default function Navbar() {
 
           {user && (
             <>
-              <NavLink href="/dashboard">Dashboard</NavLink>
-              <NavLink href="/my-trips">My Trips</NavLink>
+              <NavLink href="/dashboard">
+                Dashboard
+              </NavLink>
+              <NavLink href="/my-trips">
+                My Trips
+              </NavLink>
             </>
           )}
         </div>
@@ -205,7 +252,10 @@ export default function Navbar() {
           <ThemeToggle />
 
           {authLoading && (
-            <div className="h-10 w-28 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
+            <div
+              className="h-10 w-28 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800"
+              aria-label="Loading account"
+            />
           )}
 
           {!authLoading && !user && (
@@ -215,7 +265,7 @@ export default function Navbar() {
                 onClick={goToLogin}
                 className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
               >
-                <LogIn size={18} />
+                <LogIn size={18} aria-hidden="true" />
                 Login
               </button>
 
@@ -230,15 +280,22 @@ export default function Navbar() {
           )}
 
           {!authLoading && user && (
-            <div ref={profileMenuRef} className="relative">
+            <div
+              ref={profileMenuRef}
+              className="relative"
+            >
               <button
                 type="button"
                 onClick={() =>
-                  setProfileMenuOpen((current) => !current)
+                  setProfileMenuOpen(
+                    (current) => !current
+                  )
                 }
                 className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                aria-label="Open user menu"
                 aria-expanded={profileMenuOpen}
                 aria-haspopup="menu"
+                aria-controls="profile-menu"
               >
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 font-bold text-white">
                   {avatarLetter}
@@ -250,14 +307,18 @@ export default function Navbar() {
 
                 <ChevronDown
                   size={17}
+                  aria-hidden="true"
                   className={`text-gray-500 transition-transform ${
-                    profileMenuOpen ? "rotate-180" : ""
+                    profileMenuOpen
+                      ? "rotate-180"
+                      : ""
                   }`}
                 />
               </button>
 
               {profileMenuOpen && (
                 <div
+                  id="profile-menu"
                   role="menu"
                   className="absolute right-0 mt-3 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900"
                 >
@@ -274,21 +335,36 @@ export default function Navbar() {
                   <div className="py-2">
                     <DropdownLink
                       href="/dashboard"
-                      icon={<LayoutDashboard size={18} />}
+                      icon={
+                        <LayoutDashboard
+                          size={18}
+                          aria-hidden="true"
+                        />
+                      }
                     >
                       Dashboard
                     </DropdownLink>
 
                     <DropdownLink
                       href="/my-trips"
-                      icon={<Map size={18} />}
+                      icon={
+                        <Map
+                          size={18}
+                          aria-hidden="true"
+                        />
+                      }
                     >
                       My Trips
                     </DropdownLink>
 
                     <DropdownLink
                       href="/profile"
-                      icon={<UserCircle size={18} />}
+                      icon={
+                        <UserCircle
+                          size={18}
+                          aria-hidden="true"
+                        />
+                      }
                     >
                       Profile
                     </DropdownLink>
@@ -296,12 +372,17 @@ export default function Navbar() {
 
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={() => void handleLogout()}
                     disabled={loggingOut}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-red-950/40"
                   >
-                    <LogOut size={18} />
-                    {loggingOut ? "Logging out..." : "Logout"}
+                    <LogOut
+                      size={18}
+                      aria-hidden="true"
+                    />
+                    {loggingOut
+                      ? "Logging out..."
+                      : "Logout"}
                   </button>
                 </div>
               )}
@@ -315,7 +396,9 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() =>
-              setMobileMenuOpen((current) => !current)
+              setMobileMenuOpen(
+                (current) => !current
+              )
             }
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             aria-label={
@@ -324,28 +407,48 @@ export default function Navbar() {
                 : "Open navigation menu"
             }
             aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
           >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            {mobileMenuOpen ? (
+              <X size={22} aria-hidden="true" />
+            ) : (
+              <Menu size={22} aria-hidden="true" />
+            )}
           </button>
         </div>
       </nav>
 
       {mobileMenuOpen && (
-        <div className="border-t border-gray-200 bg-white px-4 py-5 shadow-lg dark:border-gray-800 dark:bg-gray-950 lg:hidden">
+        <div
+          id="mobile-navigation"
+          className="border-t border-gray-200 bg-white px-4 py-5 shadow-lg dark:border-gray-800 dark:bg-gray-950 lg:hidden"
+        >
           <div className="mx-auto max-w-7xl space-y-2">
-            <MobileNavLink href="/#home" onClick={closeMenus}>
+            <MobileNavLink
+              href="/#home"
+              onClick={closeMenus}
+            >
               Home
             </MobileNavLink>
 
-            <MobileNavLink href="/#features" onClick={closeMenus}>
+            <MobileNavLink
+              href="/#features"
+              onClick={closeMenus}
+            >
               Features
             </MobileNavLink>
 
-            <MobileNavLink href="/#pricing" onClick={closeMenus}>
+            <MobileNavLink
+              href="/#pricing"
+              onClick={closeMenus}
+            >
               Pricing
             </MobileNavLink>
 
-            <MobileNavLink href="/#contact" onClick={closeMenus}>
+            <MobileNavLink
+              href="/#contact"
+              onClick={closeMenus}
+            >
               Contact
             </MobileNavLink>
 
@@ -376,7 +479,10 @@ export default function Navbar() {
 
             <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
               {authLoading && (
-                <div className="h-12 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
+                <div
+                  className="h-12 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800"
+                  aria-label="Loading account"
+                />
               )}
 
               {!authLoading && !user && (
@@ -386,7 +492,10 @@ export default function Navbar() {
                     onClick={goToLogin}
                     className="flex items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                   >
-                    <LogIn size={18} />
+                    <LogIn
+                      size={18}
+                      aria-hidden="true"
+                    />
                     Login
                   </button>
 
@@ -420,12 +529,17 @@ export default function Navbar() {
 
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={() => void handleLogout()}
                     disabled={loggingOut}
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500 px-4 py-3 font-semibold text-red-600 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <LogOut size={18} />
-                    {loggingOut ? "Logging out..." : "Logout"}
+                    <LogOut
+                      size={18}
+                      aria-hidden="true"
+                    />
+                    {loggingOut
+                      ? "Logging out..."
+                      : "Logout"}
                   </button>
                 </div>
               )}
@@ -442,7 +556,10 @@ type NavLinkProps = {
   children: ReactNode;
 };
 
-function NavLink({ href, children }: NavLinkProps) {
+function NavLink({
+  href,
+  children,
+}: NavLinkProps) {
   return (
     <Link
       href={href}

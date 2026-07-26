@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   CalendarDays,
   CircleDollarSign,
@@ -48,11 +48,7 @@ export default function DashboardPage() {
     useState<DashboardData>(emptyDashboardData);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
-
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -84,7 +80,7 @@ export default function DashboardPage() {
         cache: "no-store",
       });
 
-      const result = await response.json();
+      const result = (await response.json()) as DashboardData & { error?: string };
 
       if (!response.ok) {
         throw new Error(
@@ -104,7 +100,17 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loadDashboard]);
 
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("en-IN", {

@@ -154,15 +154,24 @@ export default function TripMapClient({
   );
 
   useEffect(() => {
-    setRoute(null);
-    setRouteWarning("");
+    if (destinations.length < 2) {
+      const resetTimer = window.setTimeout(() => {
+        setRoute(null);
+        setRouteWarning("");
+        setRouteLoading(false);
+      }, 0);
 
-    if (destinations.length < 2) return;
+      return () => {
+        window.clearTimeout(resetTimer);
+      };
+    }
 
     const controller = new AbortController();
 
     async function loadRoute() {
       try {
+        setRoute(null);
+        setRouteWarning("");
         setRouteLoading(true);
 
         const response = await fetch("/api/maps/route", {

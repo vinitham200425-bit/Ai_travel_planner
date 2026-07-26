@@ -69,17 +69,20 @@ export default function TripWeatherForecast({
 
   useEffect(() => {
     if (
-      typeof latitude !== "number" ||
-      typeof longitude !== "number" ||
-      !startDate ||
-      !endDate
-    ) {
-      setForecast([]);
-      setUnavailableReason("");
-      setErrorMessage("");
-      onForecastChange?.([]);
-      return;
-    }
+  typeof latitude !== "number" ||
+  typeof longitude !== "number" ||
+  !startDate ||
+  !endDate
+) {
+  const timer = setTimeout(() => {
+    setForecast([]);
+    setUnavailableReason("");
+    setErrorMessage("");
+    onForecastChange?.([]);
+  }, 0);
+
+  return () => clearTimeout(timer);
+}
 
     const controller = new AbortController();
 

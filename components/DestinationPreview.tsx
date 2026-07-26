@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 type WeatherPreview = {
   temperature: number | null;
   apparentTemperature: number | null;
@@ -38,6 +40,17 @@ type DestinationPreviewProps = {
   error: string;
 };
 
+function formatWeatherValue(
+  value: number | null,
+  unit: string
+): string {
+  if (value === null || !Number.isFinite(value)) {
+    return "Unavailable";
+  }
+
+  return `${Math.round(value)}${unit}`;
+}
+
 export default function DestinationPreview({
   preview,
   loading,
@@ -45,7 +58,11 @@ export default function DestinationPreview({
 }: DestinationPreviewProps) {
   if (loading) {
     return (
-      <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+      <div
+        aria-busy="true"
+        aria-label="Loading destination preview"
+        className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+      >
         <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700" />
 
         <div className="space-y-4 p-6">
@@ -59,7 +76,10 @@ export default function DestinationPreview({
 
   if (error) {
     return (
-      <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+      <div
+        role="alert"
+        className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+      >
         <p className="font-semibold">
           Destination preview unavailable
         </p>
@@ -73,19 +93,56 @@ export default function DestinationPreview({
     return null;
   }
 
+  const imageAlt = `${preview.destination}, ${preview.country}`;
+
+  const temperature = preview.weather
+    ? formatWeatherValue(
+        preview.weather.temperature,
+        preview.weather.units.temperature
+      )
+    : "Unavailable";
+
+  const apparentTemperature = preview.weather
+    ? formatWeatherValue(
+        preview.weather.apparentTemperature,
+        preview.weather.units.apparentTemperature
+      )
+    : "Unavailable";
+
+  const humidity = preview.weather
+    ? formatWeatherValue(
+        preview.weather.humidity,
+        preview.weather.units.humidity
+      )
+    : "Unavailable";
+
+  const windSpeed = preview.weather
+    ? formatWeatherValue(
+        preview.weather.windSpeed,
+        preview.weather.units.windSpeed
+      )
+    : "Unavailable";
+
   return (
-    <div className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
+    <section className="mt-8 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
       <div className="relative h-64 bg-gradient-to-r from-blue-600 to-cyan-500 sm:h-80">
         {preview.imageUrl ? (
-          <img
+          <Image
             src={preview.imageUrl}
-            alt={`${preview.destination}, ${preview.country}`}
-            className="h-full w-full object-cover"
+            alt={imageAlt}
+            fill
+            sizes="(max-width: 640px) 100vw, 1200px"
+            className="object-cover"
           />
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="text-center text-white">
-              <span className="text-6xl">🌍</span>
+              <span
+                aria-hidden="true"
+                className="text-6xl"
+              >
+                🌍
+              </span>
 
               <p className="mt-3 text-2xl font-bold">
                 {preview.destination}
@@ -96,7 +153,7 @@ export default function DestinationPreview({
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+        <div className="absolute inset-x-0 bottom-0 p-6 text-white">
           <p className="text-sm font-medium uppercase tracking-wider text-white/80">
             Selected destination
           </p>
@@ -117,7 +174,7 @@ export default function DestinationPreview({
         </p>
 
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-2xl bg-blue-50 p-5 dark:bg-blue-950/40">
+          <article className="rounded-2xl bg-blue-50 p-5 dark:bg-blue-950/40">
             <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
               🌡 Current weather
             </p>
@@ -125,17 +182,16 @@ export default function DestinationPreview({
             {preview.weather ? (
               <>
                 <div className="mt-3 flex items-center gap-3">
-                  <span className="text-4xl">
+                  <span
+                    aria-hidden="true"
+                    className="text-4xl"
+                  >
                     {preview.weather.icon}
                   </span>
 
                   <div>
                     <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {preview.weather.temperature}
-                      {
-                        preview.weather.units
-                          .temperature
-                      }
+                      {temperature}
                     </p>
 
                     <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -145,15 +201,7 @@ export default function DestinationPreview({
                 </div>
 
                 <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  Feels like{" "}
-                  {
-                    preview.weather
-                      .apparentTemperature
-                  }
-                  {
-                    preview.weather.units
-                      .apparentTemperature
-                  }
+                  Feels like {apparentTemperature}
                 </p>
               </>
             ) : (
@@ -161,9 +209,9 @@ export default function DestinationPreview({
                 Weather information is currently unavailable.
               </p>
             )}
-          </div>
+          </article>
 
-          <div className="rounded-2xl bg-green-50 p-5 dark:bg-green-950/40">
+          <article className="rounded-2xl bg-green-50 p-5 dark:bg-green-950/40">
             <p className="text-sm font-semibold text-green-700 dark:text-green-300">
               📅 General best season
             </p>
@@ -175,58 +223,51 @@ export default function DestinationPreview({
             <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
               {preview.bestSeason.note}
             </p>
-          </div>
+          </article>
 
-          <div className="rounded-2xl bg-purple-50 p-5 sm:col-span-2 lg:col-span-1 dark:bg-purple-950/40">
+          <article className="rounded-2xl bg-purple-50 p-5 sm:col-span-2 lg:col-span-1 dark:bg-purple-950/40">
             <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">
               🧭 Location
             </p>
 
             <p className="mt-3 text-sm text-gray-700 dark:text-gray-200">
-              Latitude:{" "}
-              {preview.latitude.toFixed(4)}
+              Latitude: {preview.latitude.toFixed(4)}
             </p>
 
             <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">
-              Longitude:{" "}
-              {preview.longitude.toFixed(4)}
+              Longitude: {preview.longitude.toFixed(4)}
             </p>
 
             {preview.wikipediaUrl && (
               <a
                 href={preview.wikipediaUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="mt-4 inline-block text-sm font-semibold text-purple-700 hover:underline dark:text-purple-300"
               >
                 Read more about this destination ↗
               </a>
             )}
-          </div>
+          </article>
         </div>
 
         {preview.weather && (
           <div className="mt-5 flex flex-wrap gap-3 text-sm text-gray-600 dark:text-gray-300">
             <span className="rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-700">
-              💧 Humidity:{" "}
-              {preview.weather.humidity}
-              {preview.weather.units.humidity}
+              💧 Humidity: {humidity}
             </span>
 
             <span className="rounded-full bg-gray-100 px-4 py-2 dark:bg-gray-700">
-              💨 Wind:{" "}
-              {preview.weather.windSpeed}
-              {" "}
-              {preview.weather.units.windSpeed}
+              💨 Wind: {windSpeed}
             </span>
           </div>
         )}
 
         <p className="mt-5 text-xs text-gray-400">
-          The best-season suggestion is a general regional
-          guide. Local weather and peak seasons can vary.
+          The best-season suggestion is a general regional guide.
+          Local weather and peak seasons can vary.
         </p>
       </div>
-    </div>
+    </section>
   );
 }

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -89,13 +89,7 @@ export default function TripDetailsPage() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
 
-  useEffect(() => {
-    if (tripId) {
-      void loadTrip();
-    }
-  }, [tripId]);
-
-  async function loadTrip() {
+  const loadTrip = useCallback(async () => {
     try {
       setLoading(true);
       setErrorMessage("");
@@ -133,7 +127,21 @@ export default function TripDetailsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadTrip();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loadTrip, tripId]);
 
   async function loadWeather(
     destination: string,
@@ -571,6 +579,33 @@ export default function TripDetailsPage() {
     } finally {
       setUpdatingFavorite(false);
     }
+  }
+
+  if (!tripId) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6 pt-24 dark:bg-gray-950">
+        <section className="w-full max-w-lg rounded-3xl bg-white p-10 text-center shadow-md dark:bg-gray-900">
+          <Plane
+            aria-hidden="true"
+            size={52}
+            className="mx-auto text-gray-300 dark:text-gray-600"
+          />
+          <h1 className="mt-5 text-2xl font-bold text-gray-900 dark:text-white">
+            Trip unavailable
+          </h1>
+          <p className="mt-3 text-gray-500 dark:text-gray-400">
+            A valid trip ID was not provided.
+          </p>
+          <Link
+            href="/my-trips"
+            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
+          >
+            <ArrowLeft aria-hidden="true" size={19} />
+            Back to My Trips
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   if (loading) {

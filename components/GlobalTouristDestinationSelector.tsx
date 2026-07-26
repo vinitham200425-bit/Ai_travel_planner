@@ -1,12 +1,14 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import toast from "react-hot-toast";
+
 import type { TouristPlace } from "@/lib/tourist-place";
 
 type Props = {
@@ -29,19 +31,21 @@ type NearbyResponse = {
   message?: string;
 };
 
+type PlaceCardProps = {
+  place: TouristPlace;
+  selected: boolean;
+  disabled: boolean;
+  isMainDestination?: boolean;
+  onClick: () => void;
+};
+
 function PlaceCard({
   place,
   selected,
   disabled,
   isMainDestination = false,
   onClick,
-}: {
-  place: TouristPlace;
-  selected: boolean;
-  disabled: boolean;
-  isMainDestination?: boolean;
-  onClick: () => void;
-}) {
+}: PlaceCardProps) {
   return (
     <article
       className={`overflow-hidden rounded-2xl border transition ${
@@ -51,6 +55,8 @@ function PlaceCard({
       }`}
     >
       {place.imageUrl && (
+        // Kept as a normal image so remote URLs work without
+        // requiring additional Next.js image-domain configuration.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={place.imageUrl}
@@ -87,6 +93,12 @@ function PlaceCard({
               type="button"
               disabled={disabled}
               onClick={onClick}
+              aria-pressed={selected}
+              aria-label={
+                selected
+                  ? `Remove ${place.name}`
+                  : `Add ${place.name}`
+              }
               className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 selected
                   ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/60 dark:text-red-300"
@@ -147,6 +159,11 @@ export default function GlobalTouristDestinationSelector({
   const [searchMessage, setSearchMessage] = useState("");
 
   const searchBoxRef = useRef<HTMLDivElement | null>(null);
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const primaryPlace = selectedPlaces[0] ?? null;
 
@@ -155,25 +172,25 @@ export default function GlobalTouristDestinationSelector({
     [selectedPlaces]
   );
 
-  /*
-   * Clear the selected destination whenever the country changes.
-   */
-  useEffect(() => {
+  const resetSelector = useCallback(() => {
     setSearchText("");
     setSuggestions([]);
     setNearbyPlaces([]);
     setSearchMessage("");
     setShowSuggestions(false);
-    onChange([]);
+  }, []);
 
-    // onChange is intentionally excluded because it is recreated
-    // by the parent component.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countryCode, countryName]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      resetSelector();
+      onChangeRef.current([]);
+    }, 0);
 
-  /*
-   * Close autocomplete when the user clicks outside the search area.
-   */
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [countryCode, countryName, resetSelector]);
+
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
       if (
@@ -184,19 +201,27 @@ export default function GlobalTouristDestinationSelector({
       }
     }
 
+    function handleEscapeKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowSuggestions(false);
+      }
+    }
+
     document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscapeKey);
 
     return () => {
       document.removeEventListener(
         "mousedown",
         handleOutsideClick
       );
+      document.removeEventListener(
+        "keydown",
+        handleEscapeKey
+      );
     };
   }, []);
 
-  /*
-   * Search destinations after a short delay.
-   */
   useEffect(() => {
     const query = searchText.trim();
 
@@ -205,10 +230,15 @@ export default function GlobalTouristDestinationSelector({
       query.length < 2 ||
       primaryPlace?.name === query
     ) {
-      setSuggestions([]);
-      setSearchMessage("");
-      setSearchLoading(false);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setSuggestions([]);
+        setSearchMessage("");
+        setSearchLoading(false);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(resetTimer);
+      };
     }
 
     const controller = new AbortController();
@@ -264,7 +294,9 @@ export default function GlobalTouristDestinationSelector({
             : "Unable to search destinations."
         );
       } finally {
-        setSearchLoading(false);
+        if (!controller.signal.aborted) {
+          setSearchLoading(false);
+        }
       }
     }, 700);
 
@@ -272,15 +304,18 @@ export default function GlobalTouristDestinationSelector({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [countryCode, searchText, primaryPlace?.name]);
+  }, [countryCode, primaryPlace?.name, searchText]);
 
-  /*
-   * Load nearby trip options when the main destination is selected.
-   */
   useEffect(() => {
     if (!primaryPlace || !countryCode || !countryName) {
-      setNearbyPlaces([]);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setNearbyPlaces([]);
+        setNearbyLoading(false);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(resetTimer);
+      };
     }
 
     const controller = new AbortController();
@@ -292,8 +327,8 @@ export default function GlobalTouristDestinationSelector({
         const params = new URLSearchParams({
           countryCode,
           countryName,
-          latitude: String(primaryPlace!.latitude),
-          longitude: String(primaryPlace!.longitude),
+          latitude: String(primaryPlace.latitude),
+          longitude: String(primaryPlace.longitude),
           radiusKm: "120",
           limit: "20",
         });
@@ -317,9 +352,9 @@ export default function GlobalTouristDestinationSelector({
 
         const results = (data.places ?? []).filter(
           (place) =>
-            place.id !== primaryPlace!.id &&
+            place.id !== primaryPlace.id &&
             place.name.toLowerCase() !==
-              primaryPlace!.name.toLowerCase()
+              primaryPlace.name.toLowerCase()
         );
 
         setNearbyPlaces(results);
@@ -339,71 +374,96 @@ export default function GlobalTouristDestinationSelector({
             : "Unable to load nearby tourist places."
         );
       } finally {
-        setNearbyLoading(false);
+        if (!controller.signal.aborted) {
+          setNearbyLoading(false);
+        }
       }
     }
 
     void loadNearbyPlaces();
 
-    return () => controller.abort();
-  }, [countryCode, countryName, primaryPlace]);
+    return () => {
+      controller.abort();
+    };
+  }, [
+    countryCode,
+    countryName,
+    primaryPlace,
+  ]);
 
-  function selectMainDestination(place: TouristPlace) {
-    setSearchText(place.name);
-    setSuggestions([]);
-    setNearbyPlaces([]);
-    setShowSuggestions(false);
-    setSearchMessage("");
+  const selectMainDestination = useCallback(
+    (place: TouristPlace) => {
+      setSearchText(place.name);
+      setSuggestions([]);
+      setNearbyPlaces([]);
+      setShowSuggestions(false);
+      setSearchMessage("");
 
-    onChange([place]);
-  }
+      onChange([place]);
+    },
+    [onChange]
+  );
 
-  function toggleNearbyPlace(place: TouristPlace) {
-    if (!primaryPlace) {
-      toast.error("Please select a main destination first.");
-      return;
-    }
+  const toggleNearbyPlace = useCallback(
+    (place: TouristPlace) => {
+      if (!primaryPlace) {
+        toast.error("Please select a main destination first.");
+        return;
+      }
 
-    if (selectedIds.has(place.id)) {
+      if (selectedIds.has(place.id)) {
+        onChange(
+          selectedPlaces.filter(
+            (selectedPlace) =>
+              selectedPlace.id !== place.id
+          )
+        );
+        return;
+      }
+
+      if (selectedPlaces.length >= 6) {
+        toast.error(
+          "You can add up to 5 nearby places with the main destination."
+        );
+        return;
+      }
+
+      onChange([...selectedPlaces, place]);
+    },
+    [
+      onChange,
+      primaryPlace,
+      selectedIds,
+      selectedPlaces,
+    ]
+  );
+
+  const clearMainDestination = useCallback(() => {
+    resetSelector();
+    onChange([]);
+  }, [onChange, resetSelector]);
+
+  const removeSelectedPlace = useCallback(
+    (place: TouristPlace) => {
+      if (place.id === primaryPlace?.id) {
+        clearMainDestination();
+        return;
+      }
+
       onChange(
         selectedPlaces.filter(
-          (selectedPlace) => selectedPlace.id !== place.id
+          (selectedPlace) =>
+            selectedPlace.id !== place.id
         )
       );
-      return;
-    }
-
-    if (selectedPlaces.length >= 6) {
-      toast.error(
-        "You can add up to 5 nearby places with the main destination."
-      );
-      return;
-    }
-
-    onChange([...selectedPlaces, place]);
-  }
-
-  function removeSelectedPlace(place: TouristPlace) {
-    if (place.id === primaryPlace?.id) {
-      clearMainDestination();
-      return;
-    }
-
-    onChange(
-      selectedPlaces.filter(
-        (selectedPlace) => selectedPlace.id !== place.id
-      )
-    );
-  }
-
-  function clearMainDestination() {
-    setSearchText("");
-    setSuggestions([]);
-    setNearbyPlaces([]);
-    setSearchMessage("");
-    setShowSuggestions(false);
-    onChange([]);
-  }
+    },
+    [
+      clearMainDestination,
+      onChange,
+      primaryPlace?.id,
+      selectedPlaces,
+    ]
+  );
 
   if (!countryCode) {
     return (
@@ -428,9 +488,14 @@ export default function GlobalTouristDestinationSelector({
           <input
             id="destination-search"
             type="search"
+            role="combobox"
             autoComplete="off"
             value={searchText}
             disabled={disabled}
+            aria-autocomplete="list"
+            aria-controls="destination-suggestions"
+            aria-expanded={showSuggestions}
+            aria-describedby="destination-search-help"
             onFocus={() => {
               if (suggestions.length > 0) {
                 setShowSuggestions(true);
@@ -450,18 +515,24 @@ export default function GlobalTouristDestinationSelector({
                 setNearbyPlaces([]);
               }
             }}
-            placeholder={`Example: Ooty, Munnar or Goa`}
+            placeholder="Example: Ooty, Munnar or Goa"
             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-12 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:ring-blue-950"
           />
 
           {searchLoading && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+            <div
+              className="absolute right-4 top-1/2 -translate-y-1/2"
+              aria-hidden="true"
+            >
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
             </div>
           )}
         </div>
 
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p
+          id="destination-search-help"
+          className="mt-2 text-xs text-gray-500 dark:text-gray-400"
+        >
           Type at least two letters and select the correct
           destination from the suggestions.
         </p>
@@ -470,15 +541,26 @@ export default function GlobalTouristDestinationSelector({
           (suggestions.length > 0 ||
             searchLoading ||
             searchMessage) && (
-            <div className="absolute z-[1000] mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800">
+            <div
+              id="destination-suggestions"
+              role="listbox"
+              aria-label="Destination suggestions"
+              className="absolute z-[1000] mt-2 max-h-80 w-full overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+            >
               {searchLoading && suggestions.length === 0 && (
-                <p className="p-4 text-sm text-gray-500 dark:text-gray-400">
+                <p
+                  role="status"
+                  className="p-4 text-sm text-gray-500 dark:text-gray-400"
+                >
                   Searching destinations...
                 </p>
               )}
 
               {!searchLoading && searchMessage && (
-                <p className="p-4 text-sm text-gray-500 dark:text-gray-400">
+                <p
+                  role="status"
+                  className="p-4 text-sm text-gray-500 dark:text-gray-400"
+                >
                   {searchMessage}
                 </p>
               )}
@@ -487,16 +569,22 @@ export default function GlobalTouristDestinationSelector({
                 <button
                   key={place.id}
                   type="button"
-                  onClick={() => selectMainDestination(place)}
-                  className="block w-full border-b border-gray-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-blue-50 dark:border-gray-700 dark:hover:bg-gray-700"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() =>
+                    selectMainDestination(place)
+                  }
+                  className="block w-full border-b border-gray-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:bg-gray-700"
                 >
                   <p className="font-semibold text-gray-900 dark:text-white">
                     📍 {place.name}
                   </p>
 
-                  <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
-                    {place.description}
-                  </p>
+                  {place.description && (
+                    <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
+                      {place.description}
+                    </p>
+                  )}
                 </button>
               ))}
             </div>
@@ -514,7 +602,7 @@ export default function GlobalTouristDestinationSelector({
               type="button"
               disabled={disabled}
               onClick={clearMainDestination}
-              className="text-sm font-semibold text-red-600 hover:text-red-700 disabled:opacity-60 dark:text-red-400"
+              className="text-sm font-semibold text-red-600 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400"
             >
               Change destination
             </button>
@@ -542,8 +630,11 @@ export default function GlobalTouristDestinationSelector({
                 key={place.id}
                 type="button"
                 disabled={disabled}
-                onClick={() => removeSelectedPlace(place)}
-                className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                onClick={() =>
+                  removeSelectedPlace(place)
+                }
+                aria-label={`Remove ${place.name} from itinerary`}
+                className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {place.name} ×
               </button>
@@ -566,8 +657,14 @@ export default function GlobalTouristDestinationSelector({
           </div>
 
           {nearbyLoading ? (
-            <div className="mt-5 rounded-xl border border-amber-200 bg-white/70 p-7 text-center dark:border-amber-900 dark:bg-gray-900/50">
-              <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+            <div
+              role="status"
+              className="mt-5 rounded-xl border border-amber-200 bg-white/70 p-7 text-center dark:border-amber-900 dark:bg-gray-900/50"
+            >
+              <div
+                className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"
+                aria-hidden="true"
+              />
 
               <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
                 Finding nearby cities, attractions and day-trip
@@ -582,7 +679,9 @@ export default function GlobalTouristDestinationSelector({
                   place={place}
                   selected={selectedIds.has(place.id)}
                   disabled={disabled}
-                  onClick={() => toggleNearbyPlace(place)}
+                  onClick={() =>
+                    toggleNearbyPlace(place)
+                  }
                 />
               ))}
             </div>
