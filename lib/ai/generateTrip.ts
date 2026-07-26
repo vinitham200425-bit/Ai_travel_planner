@@ -1,4 +1,4 @@
-import { gemini, GEMINI_MODEL } from "./gemini";
+import { getGeminiClient, GEMINI_MODEL } from "./gemini";
 
 function getStatus(error: unknown): number | undefined {
   if (
@@ -22,6 +22,8 @@ function getMessage(error: unknown): string {
 }
 
 export async function generateTrip(prompt: string): Promise<string> {
+  const gemini = getGeminiClient();
+
   try {
     const response = await gemini.models.generateContent({
       model: GEMINI_MODEL,
