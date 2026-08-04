@@ -1,52 +1,105 @@
+import { createServerClient } from "@supabase/ssr";
 import {
-  type NextRequest,
   NextResponse,
+  type NextRequest,
 } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({
+    request,
+  });
 
-export async function GET(
-  request: NextRequest
-) {
-  const requestUrl = new URL(request.url);
-  const code =
-    requestUrl.searchParams.get("code");
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (!code) {
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
     console.error(
-      "Magic-link callback: code is missing."
+      "Supabase environment variables are missing."
     );
 
-    return NextResponse.redirect(
-      new URL(
-        "/forgot-password?error=missing_code",
-        request.url
-      )
-    );
+    return response;
   }
 
-  const supabase = await createClient();
+  const supabase = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
 
-  const { error } =
-    await supabase.auth.exchangeCodeForSession(
-      code
-    );
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(
+            ({ name, value }) => {
+              request.cookies.set(name, value);
+            }
+          );
 
-  if (error) {
-    console.error(
-      "Magic-link callback exchange failed:",
-      error
-    );
+          response = NextResponse.next({
+            request,
+          });
 
-    return NextResponse.redirect(
-      new URL(
-        "/forgot-password?error=invalid_or_expired_link",
-        request.url
-      )
-    );
-  }
-
-  return NextResponse.redirect(
-    new URL("/set-password", request.url)
+          cookiesToSet.forEach(
+            ({ name, value, options }) => {
+              response.cookies.set(
+                name,
+                value,
+                options
+              );
+            }
+          );
+        },
+      },
+    }
   );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+
+  const protectedRoutes = [
+    "/dashboard",
+    "/my-trips",
+    "/profile",
+  ];
+
+  const isProtectedRoute = protectedRoutes.some(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(`${route}/`)
+  );
+
+  if (!user && isProtectedRoute) {
+    const loginUrl = request.nextUrl.clone();
+
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", pathname);
+
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const authRoutes = ["/login", "/signup"];
+
+  if (user && authRoutes.includes(pathname)) {
+    const homeUrl = request.nextUrl.clone();
+
+    homeUrl.pathname = "/";
+    homeUrl.search = "";
+
+    return NextResponse.redirect(homeUrl);
+  }
+
+  return response;
 }
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+};
