@@ -38,14 +38,13 @@ export default function ForgotPasswordPage() {
         `${window.location.origin}` +
         "/auth/callback?next=/set-password";
 
-      const { error } =
-        await supabase.auth.signInWithOtp({
-          email: normalizedEmail,
-          options: {
-            shouldCreateUser: false,
-            emailRedirectTo: redirectUrl,
-          },
-        });
+      const { error } = await supabase.auth.signInWithOtp({
+  email: normalizedEmail,
+  options: {
+    shouldCreateUser: false,
+    emailRedirectTo: redirectUrl,
+  },
+});
 
       if (error) {
         throw error;

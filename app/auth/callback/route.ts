@@ -3,21 +3,17 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
-
-  const code = searchParams.get("code");
-  const requestedNext =
-    searchParams.get("next") ?? "/set-password";
-
-  const next = requestedNext.startsWith("/")
-    ? requestedNext
-    : "/set-password";
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
 
   if (!code) {
-    console.error("Auth callback: code is missing.");
+    console.error("Magic-link callback: code is missing.");
 
     return NextResponse.redirect(
-      `${origin}/forgot-password?error=missing_code`
+      new URL(
+        "/forgot-password?error=missing_code",
+        request.url
+      )
     );
   }
 
@@ -28,14 +24,19 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error(
-      "Auth callback exchange error:",
+      "Magic-link callback exchange failed:",
       error
     );
 
     return NextResponse.redirect(
-      `${origin}/forgot-password?error=callback_failed`
+      new URL(
+        "/forgot-password?error=invalid_or_expired_link",
+        request.url
+      )
     );
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return NextResponse.redirect(
+    new URL("/set-password", request.url)
+  );
 }

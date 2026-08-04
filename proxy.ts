@@ -1,95 +1,52 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import {
+  type NextRequest,
+  NextResponse,
+} from "next/server";
 
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  });
+import { createClient } from "@/lib/supabase/server";
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export async function GET(
+  request: NextRequest
+) {
+  const requestUrl = new URL(request.url);
+  const code =
+    requestUrl.searchParams.get("code");
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Supabase environment variables are missing.");
-    return response;
+  if (!code) {
+    console.error(
+      "Magic-link callback: code is missing."
+    );
+
+    return NextResponse.redirect(
+      new URL(
+        "/forgot-password?error=missing_code",
+        request.url
+      )
+    );
   }
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+  const supabase = await createClient();
 
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
+  const { error } =
+    await supabase.auth.exchangeCodeForSession(
+      code
+    );
 
-          response = NextResponse.next({
-            request,
-          });
+  if (error) {
+    console.error(
+      "Magic-link callback exchange failed:",
+      error
+    );
 
-          cookiesToSet.forEach(
-            ({ name, value, options }) => {
-              response.cookies.set(name, value, options);
-            }
-          );
-        },
-      },
-    }
+    return NextResponse.redirect(
+      new URL(
+        "/forgot-password?error=invalid_or_expired_link",
+        request.url
+      )
+    );
+  }
+
+  return NextResponse.redirect(
+    new URL("/set-password", request.url)
   );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-
-  const protectedRoutes = [
-    "/dashboard",
-    "/my-trips",
-    "/profile",
-  ];
-
-  const isProtectedRoute = protectedRoutes.some(
-    (route) =>
-      pathname === route ||
-      pathname.startsWith(`${route}/`)
-  );
-
-  // Logged-out users cannot access protected pages
-  if (!user && isProtectedRoute) {
-    const loginUrl = request.nextUrl.clone();
-
-    loginUrl.pathname = "/login";
-
-    return NextResponse.redirect(loginUrl);
-  }
-
-  const authRoutes = ["/login", "/signup"];
-
-  // Logged-in users visiting login/signup go to home
-  if (user && authRoutes.includes(pathname)) {
-    const homeUrl = request.nextUrl.clone();
-
-    homeUrl.pathname = "/";
-
-    return NextResponse.redirect(homeUrl);
-  }
-
-  return response;
 }
-
-export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/my-trips/:path*",
-    "/profile/:path*",
-    "/login",
-    "/signup",
-  ],
-};
