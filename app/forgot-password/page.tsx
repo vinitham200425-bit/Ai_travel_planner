@@ -1,15 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useState } from "react";
+import {
+  type FormEvent,
+  useState,
+} from "react";
 
-import { supabase } from "@/lib/supabase";
+import { recoverySupabase } from "@/lib/supabase-recovery";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
   const [successMessage, setSuccessMessage] =
     useState("");
 
@@ -35,29 +41,21 @@ export default function ForgotPasswordPage() {
     try {
       setLoading(true);
 
-      /*
-        The magic link returns directly to /set-password.
+      const configuredSiteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.replace(
+          /\/$/,
+          ""
+        );
 
-        The set-password page will:
-        1. Exchange the PKCE code for a Supabase session.
-        2. Allow the authenticated user to create a password.
-      */
       const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+        configuredSiteUrl ||
+        window.location.origin;
 
-if (!siteUrl) {
-  throw new Error(
-    "NEXT_PUBLIC_SITE_URL is not configured."
-  );
-}
-
-const emailRedirectTo =
-  `${siteUrl}/set-password`;
-
-console.log("Redirect URL:", emailRedirectTo);
+      const emailRedirectTo =
+        `${siteUrl}/set-password`;
 
       const { error } =
-        await supabase.auth.signInWithOtp({
+        await recoverySupabase.auth.signInWithOtp({
           email: normalizedEmail,
           options: {
             shouldCreateUser: false,
@@ -70,11 +68,11 @@ console.log("Redirect URL:", emailRedirectTo);
       }
 
       setSuccessMessage(
-        "A secure sign-in link has been sent to your email. Open the newest link in the same browser and device to create your new password."
+        "A secure sign-in link has been sent to your email. Open only the newest link to create your new password."
       );
     } catch (error) {
       console.error(
-        "Unable to send magic link:",
+        "Unable to send recovery link:",
         error
       );
 
@@ -104,9 +102,9 @@ console.log("Redirect URL:", emailRedirectTo);
           </h1>
 
           <p className="mt-3 leading-7 text-gray-500 dark:text-gray-400">
-            Enter your registered email address. We will
-            send a secure sign-in link so you can create a
-            new password.
+            Enter your registered email address.
+            We will send you a secure link to create
+            a new password.
           </p>
         </div>
 
@@ -116,14 +114,14 @@ console.log("Redirect URL:", emailRedirectTo);
         >
           <div>
             <label
-              htmlFor="email"
+              htmlFor="recovery-email"
               className="mb-2 block font-semibold text-gray-700 dark:text-gray-200"
             >
               Email Address
             </label>
 
             <input
-              id="email"
+              id="recovery-email"
               type="email"
               value={email}
               onChange={(event) =>
@@ -140,7 +138,7 @@ console.log("Redirect URL:", emailRedirectTo);
           {errorMessage && (
             <div
               role="alert"
-              className="rounded-xl bg-red-50 p-4 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+              className="rounded-xl bg-red-50 p-4 leading-6 text-red-700 dark:bg-red-950/40 dark:text-red-300"
             >
               {errorMessage}
             </div>

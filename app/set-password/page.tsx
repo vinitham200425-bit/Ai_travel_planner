@@ -8,177 +8,137 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-import { supabase } from "@/lib/supabase";
+import { recoverySupabase } from "@/lib/supabase-recovery";
 
 export default function SetPasswordPage() {
   const router = useRouter();
 
   const [newPassword, setNewPassword] =
     useState("");
-  const [confirmPassword, setConfirmPassword] =
-    useState("");
 
-  const [showNewPassword, setShowNewPassword] =
-    useState(false);
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
+
+  const [
+    showNewPassword,
+    setShowNewPassword,
+  ] = useState(false);
+
   const [
     showConfirmPassword,
     setShowConfirmPassword,
   ] = useState(false);
 
-  const [checkingSession, setCheckingSession] =
-    useState(true);
+  const [
+    checkingSession,
+    setCheckingSession,
+  ] = useState(true);
+
   const [sessionReady, setSessionReady] =
     useState(false);
-  const [loading, setLoading] = useState(false);
+
+  const [loading, setLoading] =
+    useState(false);
 
   const [errorMessage, setErrorMessage] =
     useState("");
+
   const [successMessage, setSuccessMessage] =
     useState("");
 
   useEffect(() => {
     let active = true;
 
-    async function prepareSession() {
-      try {
-        setCheckingSession(true);
-        setErrorMessage("");
+    const finishChecking = window.setTimeout(
+      async () => {
+        try {
+          const {
+            data: { session },
+            error,
+          } =
+            await recoverySupabase.auth.getSession();
 
-        /*
-          First check whether Supabase has already processed
-          the magic-link URL and created a session.
-        */
-        const {
-          data: { session: existingSession },
-          error: existingSessionError,
-        } = await supabase.auth.getSession();
-
-        if (existingSessionError) {
-          throw existingSessionError;
-        }
-
-        if (!active) {
-          return;
-        }
-
-        if (existingSession) {
-          setSessionReady(true);
-          return;
-        }
-
-        /*
-          PKCE magic links normally return ?code=...
-
-          Exchange that code for an authenticated session.
-          The code verifier must be available in the same
-          browser/device where the sign-in request began.
-        */
-        const currentUrl = new URL(
-          window.location.href
-        );
-
-        const code =
-          currentUrl.searchParams.get("code");
-
-        if (code) {
-          const { error: exchangeError } =
-            await supabase.auth.exchangeCodeForSession(
-              code
-            );
-
-          if (exchangeError) {
-            throw exchangeError;
+          if (error) {
+            throw error;
           }
 
+          if (!active) {
+            return;
+          }
+
+          if (!session) {
+            setSessionReady(false);
+            setErrorMessage(
+              "Your secure sign-in link is invalid or expired. Please request a new link."
+            );
+            return;
+          }
+
+          setSessionReady(true);
+          setErrorMessage("");
+
           /*
-            Remove the one-time code from the address bar
-            after it has been exchanged successfully.
+            Remove authentication tokens from the
+            visible browser address after Supabase
+            has processed them.
           */
           window.history.replaceState(
             {},
             document.title,
             "/set-password"
           );
-        }
+        } catch (error) {
+          if (!active) {
+            return;
+          }
 
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+          console.error(
+            "Recovery session error:",
+            error
+          );
 
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        if (!active) {
-          return;
-        }
-
-        if (!session) {
           setSessionReady(false);
+
           setErrorMessage(
-            "Your secure sign-in link is invalid or expired. Please request a new link and open it in the same browser and device."
+            error instanceof Error
+              ? error.message
+              : "Unable to verify your secure sign-in link."
           );
-          return;
+        } finally {
+          if (active) {
+            setCheckingSession(false);
+          }
         }
-
-        setSessionReady(true);
-        setErrorMessage("");
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-
-        console.error(
-          "Set-password session error:",
-          error
-        );
-
-        setSessionReady(false);
-
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to verify your secure sign-in link.";
-
-        if (
-          message
-            .toLowerCase()
-            .includes("code verifier")
-        ) {
-          setErrorMessage(
-            "The secure sign-in link was opened in a different browser or device. Request a new link and open it in the same browser and device."
-          );
-        } else {
-          setErrorMessage(message);
-        }
-      } finally {
-        if (active) {
-          setCheckingSession(false);
-        }
-      }
-    }
-
-    void prepareSession();
+      },
+      500
+    );
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!active) {
-          return;
-        }
+    } =
+      recoverySupabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (!active || !session) {
+            return;
+          }
 
-        if (session) {
           setSessionReady(true);
           setCheckingSession(false);
           setErrorMessage("");
+
+          window.history.replaceState(
+            {},
+            document.title,
+            "/set-password"
+          );
         }
-      }
-    );
+      );
 
     return () => {
       active = false;
+      window.clearTimeout(finishChecking);
       subscription.unsubscribe();
     };
   }, []);
@@ -223,7 +183,7 @@ export default function SetPasswordPage() {
       setLoading(true);
 
       const { error } =
-        await supabase.auth.updateUser({
+        await recoverySupabase.auth.updateUser({
           password: newPassword,
         });
 
@@ -239,10 +199,10 @@ export default function SetPasswordPage() {
       );
 
       /*
-        Sign out the temporary magic-link session so the
-        user can verify the new password through normal login.
+        Sign out the temporary magic-link
+        recovery session.
       */
-      await supabase.auth.signOut();
+      await recoverySupabase.auth.signOut();
 
       window.setTimeout(() => {
         router.replace("/login");
@@ -250,7 +210,7 @@ export default function SetPasswordPage() {
       }, 1800);
     } catch (error) {
       console.error(
-        "Create password error:",
+        "Create-password error:",
         error
       );
 
@@ -280,8 +240,8 @@ export default function SetPasswordPage() {
           </h1>
 
           <p className="mt-3 leading-7 text-gray-500 dark:text-gray-400">
-            Create a secure password that you can use for
-            future logins.
+            Create a secure password that you can
+            use for future logins.
           </p>
         </div>
 
@@ -347,7 +307,7 @@ export default function SetPasswordPage() {
                   disabled={
                     !sessionReady || loading
                   }
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400"
                 >
                   {showNewPassword
                     ? "Hide"
@@ -398,7 +358,7 @@ export default function SetPasswordPage() {
                   disabled={
                     !sessionReady || loading
                   }
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400"
                 >
                   {showConfirmPassword
                     ? "Hide"
@@ -408,8 +368,8 @@ export default function SetPasswordPage() {
             </div>
 
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Your password must contain at least 8
-              characters.
+              Your password must contain at least
+              8 characters.
             </p>
 
             {errorMessage && (
@@ -444,16 +404,17 @@ export default function SetPasswordPage() {
           </form>
         )}
 
-        {!checkingSession && !sessionReady && (
-          <div className="mt-7 text-center">
-            <Link
-              href="/forgot-password"
-              className="font-semibold text-blue-600 transition hover:text-blue-700 hover:underline dark:text-blue-400"
-            >
-              Request a new secure sign-in link
-            </Link>
-          </div>
-        )}
+        {!checkingSession &&
+          !sessionReady && (
+            <div className="mt-7 text-center">
+              <Link
+                href="/forgot-password"
+                className="font-semibold text-blue-600 transition hover:underline dark:text-blue-400"
+              >
+                Request a new secure sign-in link
+              </Link>
+            </div>
+          )}
       </section>
     </main>
   );
