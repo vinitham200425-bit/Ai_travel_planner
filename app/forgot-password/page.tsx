@@ -42,8 +42,19 @@ export default function ForgotPasswordPage() {
         1. Exchange the PKCE code for a Supabase session.
         2. Allow the authenticated user to create a password.
       */
-      const emailRedirectTo =
-        `${window.location.origin}/set-password`;
+      const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+
+if (!siteUrl) {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL is not configured."
+  );
+}
+
+const emailRedirectTo =
+  `${siteUrl}/set-password`;
+
+console.log("Redirect URL:", emailRedirectTo);
 
       const { error } =
         await supabase.auth.signInWithOtp({
