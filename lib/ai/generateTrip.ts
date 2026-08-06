@@ -21,22 +21,76 @@ function getMessage(error: unknown): string {
   return "Unable to generate itinerary.";
 }
 
-export async function generateTrip(prompt: string): Promise<string> {
+function extractJson(text: string): string {
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith("```")) {
+    return trimmed
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
+  return trimmed;
+}
+
+function validateItinerary(value: unknown): void {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("tripOverview" in value) ||
+    !("days" in value) ||
+    !Array.isArray((value as { days?: unknown }).days)
+  ) {
+    throw new Error(
+      "Gemini returned an invalid itinerary structure."
+    );
+  }
+}
+
+export async function generateTrip(
+  prompt: string
+): Promise<string> {
   const gemini = getGeminiClient();
 
   try {
     const response = await gemini.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.4,
+      },
     });
 
-    const itinerary = response.text?.trim();
+    const responseText = response.text?.trim();
 
-    if (!itinerary) {
+    if (!responseText) {
       throw new Error("Gemini returned an empty itinerary.");
     }
 
-    return itinerary;
+    const jsonText = extractJson(responseText);
+
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      throw new Error(
+        "Gemini returned an itinerary that is not valid JSON."
+      );
+    }
+
+    validateItinerary(parsed);
+
+    return JSON.stringify(parsed);
   } catch (error: unknown) {
     console.error("Gemini Error:", error);
 

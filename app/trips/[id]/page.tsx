@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -69,6 +69,126 @@ type WeatherLocation = {
   longitude: number;
 };
 
+
+type StructuredDayPlan = {
+  day: number;
+  date: string;
+  location: string;
+  morning: string[];
+  afternoon: string[];
+  evening: string[];
+  meals: {
+    breakfast: string;
+    lunch: string;
+    dinner: string;
+  };
+  transport: string;
+  stay: string;
+  weatherAdvice: string;
+  optional: string[];
+  estimatedDailyCost: string;
+};
+
+type StructuredItinerary = {
+  tripOverview: {
+    title: string;
+    route: string[];
+    summary: string;
+    feasibilityNote: string;
+  };
+  days: StructuredDayPlan[];
+  hotels: Array<{
+    nameOrArea: string;
+    category: string;
+    approximateNightlyCost: string;
+    bestFor: string;
+  }>;
+  budget: {
+    accommodation: string;
+    intercityTransport: string;
+    localTransport: string;
+    food: string;
+    attractions: string;
+    miscellaneous: string;
+    estimatedTotal: string;
+    budgetNote: string;
+  };
+  transportTips: string[];
+  mustTryFood: string[];
+  packingChecklist: string[];
+  safetyTips: string[];
+  bookingReminders: string[];
+  quickTips: string[];
+};
+
+function parseStructuredItinerary(
+  value: string
+): StructuredItinerary | null {
+  try {
+    return JSON.parse(value) as StructuredItinerary;
+  } catch {
+    return null;
+  }
+}
+
+function structuredItineraryToText(
+  itinerary: StructuredItinerary
+): string {
+  const lines: string[] = [
+    itinerary.tripOverview.title,
+    itinerary.tripOverview.summary,
+  ];
+
+  if (itinerary.tripOverview.route.length) {
+    lines.push(
+      `Route: ${itinerary.tripOverview.route.join(" -> ")}`
+    );
+  }
+
+  if (itinerary.tripOverview.feasibilityNote) {
+    lines.push(itinerary.tripOverview.feasibilityNote);
+  }
+
+  itinerary.days.forEach((day) => {
+    lines.push(
+      "",
+      `Day ${day.day} - ${day.location} (${day.date})`,
+      `Morning: ${day.morning.join("; ")}`,
+      `Afternoon: ${day.afternoon.join("; ")}`,
+      `Evening: ${day.evening.join("; ")}`,
+      `Meals: Breakfast - ${day.meals.breakfast}; Lunch - ${day.meals.lunch}; Dinner - ${day.meals.dinner}`,
+      `Transport: ${day.transport}`,
+      `Stay: ${day.stay}`,
+      `Weather: ${day.weatherAdvice}`,
+      `Estimated cost: ${day.estimatedDailyCost}`
+    );
+
+    if (day.optional.length) {
+      lines.push(`Optional: ${day.optional.join("; ")}`);
+    }
+  });
+
+  lines.push(
+    "",
+    "Approximate Budget",
+    `Accommodation: ${itinerary.budget.accommodation}`,
+    `Intercity transport: ${itinerary.budget.intercityTransport}`,
+    `Local transport: ${itinerary.budget.localTransport}`,
+    `Food: ${itinerary.budget.food}`,
+    `Attractions: ${itinerary.budget.attractions}`,
+    `Miscellaneous: ${itinerary.budget.miscellaneous}`,
+    `Estimated total: ${itinerary.budget.estimatedTotal}`,
+    itinerary.budget.budgetNote,
+    "",
+    `Packing: ${itinerary.packingChecklist.join("; ")}`,
+    `Safety: ${itinerary.safetyTips.join("; ")}`,
+    `Booking reminders: ${itinerary.bookingReminders.join("; ")}`,
+    `Quick tips: ${itinerary.quickTips.join("; ")}`
+  );
+
+  return lines.filter(Boolean).join("\n");
+}
+
 const fallbackImage =
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=85";
 
@@ -88,6 +208,14 @@ export default function TripDetailsPage() {
     useState<WeatherLocation | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
+
+  const structuredItinerary = useMemo(
+    () =>
+      trip
+        ? parseStructuredItinerary(trip.itinerary)
+        : null,
+    [trip]
+  );
 
   const loadTrip = useCallback(async () => {
     try {
@@ -404,8 +532,10 @@ export default function TripDetailsPage() {
 
       addWrappedText(
         pdf,
-        trip.itinerary ||
-          "No itinerary is available for this trip.",
+        structuredItinerary
+          ? structuredItineraryToText(structuredItinerary)
+          : trip.itinerary ||
+            "No itinerary is available for this trip.",
         margin,
         currentY,
         contentWidth,
@@ -1097,9 +1227,17 @@ export default function TripDetailsPage() {
             </div>
           </div>
 
-          <div className="mt-8 whitespace-pre-wrap rounded-2xl bg-slate-50 p-6 leading-8 text-gray-700 dark:bg-gray-800 dark:text-gray-200 sm:p-8">
-            {trip.itinerary ||
-              "No itinerary is available for this trip."}
+          <div className="mt-8">
+            {structuredItinerary ? (
+              <StructuredItineraryView
+                itinerary={structuredItinerary}
+              />
+            ) : (
+              <div className="whitespace-pre-wrap rounded-2xl bg-slate-50 p-6 leading-8 text-gray-700 dark:bg-gray-800 dark:text-gray-200 sm:p-8">
+                {trip.itinerary ||
+                  "No itinerary is available for this trip."}
+              </div>
+            )}
           </div>
 
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1150,6 +1288,226 @@ export default function TripDetailsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+
+function StructuredItineraryView({
+  itinerary,
+}: {
+  itinerary: StructuredItinerary;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl bg-blue-50 p-5 dark:bg-blue-950/30">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          {itinerary.tripOverview.title}
+        </h3>
+        <p className="mt-2 leading-7 text-gray-600 dark:text-gray-300">
+          {itinerary.tripOverview.summary}
+        </p>
+        {itinerary.tripOverview.route.length > 0 && (
+          <p className="mt-3 text-sm font-semibold text-blue-700 dark:text-blue-300">
+            {itinerary.tripOverview.route.join(" → ")}
+          </p>
+        )}
+        {itinerary.tripOverview.feasibilityNote && (
+          <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            {itinerary.tripOverview.feasibilityNote}
+          </p>
+        )}
+      </div>
+
+      {itinerary.days.map((day) => (
+        <article
+          key={day.day}
+          className="rounded-2xl border border-gray-100 p-5 dark:border-gray-700 sm:p-6"
+        >
+          <div className="flex flex-col justify-between gap-2 sm:flex-row">
+            <div>
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                Day {day.day} · {day.date}
+              </p>
+              <h4 className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+                {day.location}
+              </h4>
+            </div>
+            <span className="h-fit rounded-full bg-green-50 px-3 py-1.5 text-sm font-semibold text-green-700 dark:bg-green-950/30 dark:text-green-300">
+              {day.estimatedDailyCost}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
+            <StructuredList title="🌅 Morning" items={day.morning} />
+            <StructuredList title="☀️ Afternoon" items={day.afternoon} />
+            <StructuredList title="🌙 Evening" items={day.evening} />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <CompactInfo
+              title="🍽 Meals"
+              text={`Breakfast: ${day.meals.breakfast}\nLunch: ${day.meals.lunch}\nDinner: ${day.meals.dinner}`}
+            />
+            <CompactInfo title="🚖 Transport" text={day.transport} />
+            <CompactInfo title="🏨 Stay" text={day.stay} />
+            <CompactInfo title="🌦 Weather" text={day.weatherAdvice} />
+          </div>
+
+          {day.optional.length > 0 && (
+            <div className="mt-4 rounded-xl bg-purple-50 p-4 dark:bg-purple-950/30">
+              <p className="font-semibold text-purple-800 dark:text-purple-200">
+                Optional
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                {day.optional.map((item, index) => (
+                  <li key={`${item}-${index}`}>• {item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </article>
+      ))}
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <StructuredSection title="🏨 Hotel Suggestions">
+          <div className="space-y-3">
+            {itinerary.hotels.map((hotel, index) => (
+              <div
+                key={`${hotel.nameOrArea}-${index}`}
+                className="rounded-xl bg-slate-50 p-4 dark:bg-gray-800"
+              >
+                <p className="font-bold text-gray-900 dark:text-white">
+                  {hotel.nameOrArea}
+                </p>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {hotel.category} · {hotel.approximateNightlyCost}
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Best for: {hotel.bestFor}
+                </p>
+              </div>
+            ))}
+          </div>
+        </StructuredSection>
+
+        <StructuredSection title="💰 Approximate Budget">
+          <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+            <BudgetLine label="Accommodation" value={itinerary.budget.accommodation} />
+            <BudgetLine label="Intercity transport" value={itinerary.budget.intercityTransport} />
+            <BudgetLine label="Local transport" value={itinerary.budget.localTransport} />
+            <BudgetLine label="Food" value={itinerary.budget.food} />
+            <BudgetLine label="Attractions" value={itinerary.budget.attractions} />
+            <BudgetLine label="Miscellaneous" value={itinerary.budget.miscellaneous} />
+            <div className="border-t border-gray-200 pt-2 font-bold dark:border-gray-700">
+              <BudgetLine label="Estimated total" value={itinerary.budget.estimatedTotal} />
+            </div>
+            <p className="mt-3 rounded-xl bg-blue-50 p-3 text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+              {itinerary.budget.budgetNote}
+            </p>
+          </div>
+        </StructuredSection>
+
+        <StructuredSection title="🚖 Transport Tips">
+          <SimpleBulletList items={itinerary.transportTips} />
+        </StructuredSection>
+        <StructuredSection title="🍽 Must-Try Food">
+          <SimpleBulletList items={itinerary.mustTryFood} />
+        </StructuredSection>
+        <StructuredSection title="🎒 Packing Checklist">
+          <SimpleBulletList items={itinerary.packingChecklist} />
+        </StructuredSection>
+        <StructuredSection title="🛡 Safety Tips">
+          <SimpleBulletList items={itinerary.safetyTips} />
+        </StructuredSection>
+        <StructuredSection title="🎟 Booking Reminders">
+          <SimpleBulletList items={itinerary.bookingReminders} />
+        </StructuredSection>
+        <StructuredSection title="⭐ Quick Tips">
+          <SimpleBulletList items={itinerary.quickTips} />
+        </StructuredSection>
+      </div>
+    </div>
+  );
+}
+
+function StructuredList({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-4 dark:bg-gray-800">
+      <p className="font-bold text-gray-900 dark:text-white">
+        {title}
+      </p>
+      <SimpleBulletList items={items} />
+    </div>
+  );
+}
+
+function SimpleBulletList({ items }: { items: string[] }) {
+  return (
+    <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700 dark:text-gray-300">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`} className="flex gap-2">
+          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CompactInfo({
+  title,
+  text,
+}: {
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-100 p-4 dark:border-gray-700">
+      <p className="font-bold text-gray-900 dark:text-white">
+        {title}
+      </p>
+      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-600 dark:text-gray-300">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function StructuredSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-gray-100 p-5 dark:border-gray-700">
+      <h4 className="text-lg font-bold text-gray-900 dark:text-white">
+        {title}
+      </h4>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function BudgetLine({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex justify-between gap-4">
+      <span>{label}</span>
+      <span className="text-right font-semibold">{value}</span>
+    </div>
   );
 }
 
