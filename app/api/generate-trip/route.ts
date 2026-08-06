@@ -35,7 +35,6 @@ type GenerateTripBody = {
   startDate?: string;
   endDate?: string;
   weatherForecast?: WeatherForecastDay[];
-
 };
 
 async function getDestinationImage(
@@ -45,6 +44,10 @@ async function getDestinationImage(
   const accessKey = process.env.UNSPLASH_ACCESS_KEY;
 
   if (!accessKey) {
+    console.warn(
+      "UNSPLASH_ACCESS_KEY is missing. Using fallback image."
+    );
+
     return fallbackImage;
   }
 
@@ -89,6 +92,7 @@ async function getDestinationImage(
     return data.results?.[0]?.urls?.regular || fallbackImage;
   } catch (error) {
     console.error("DESTINATION IMAGE ERROR:", error);
+
     return fallbackImage;
   }
 }
@@ -98,11 +102,17 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Unknown error";
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return "Unknown server error";
 }
 
 export async function POST(request: Request) {
   try {
+    console.log("GENERATE TRIP: Request received.");
+
     const body = (await request.json()) as GenerateTripBody;
 
     const userId = body.userId?.trim() ?? "";
@@ -119,17 +129,21 @@ export async function POST(request: Request) {
         ?.filter((destination) => destination.name?.trim())
         .map((destination) => ({
           name: destination.name!.trim(),
-          stateOrRegion: destination.stateOrRegion?.trim() || "",
+          stateOrRegion:
+            destination.stateOrRegion?.trim() || "",
           categories: destination.categories ?? [],
           latitude: destination.latitude,
           longitude: destination.longitude,
         })) ?? [];
 
     /*
-      Backward compatibility with the older form that sends
-      only one destination through body.destination.
+      Backward compatibility with the previous
+      single-destination request format.
     */
-    if (destinations.length === 0 && body.destination?.trim()) {
+    if (
+      destinations.length === 0 &&
+      body.destination?.trim()
+    ) {
       destinations.push({
         name: body.destination.trim(),
         stateOrRegion: "",
@@ -155,7 +169,8 @@ export async function POST(request: Request) {
       return Response.json(
         {
           success: false,
-          message: "Please log in and fill all required trip fields.",
+          message:
+            "Please log in and fill all required trip fields.",
         },
         { status: 400 }
       );
@@ -164,17 +179,24 @@ export async function POST(request: Request) {
     const parsedDays = Number(body.days);
     const parsedBudget = Number(body.budget);
 
-    if (!Number.isInteger(parsedDays) || parsedDays <= 0) {
+    if (
+      !Number.isInteger(parsedDays) ||
+      parsedDays <= 0
+    ) {
       return Response.json(
         {
           success: false,
-          message: "Please enter a valid number of trip days.",
+          message:
+            "Please enter a valid number of trip days.",
         },
         { status: 400 }
       );
     }
 
-    if (!Number.isFinite(parsedBudget) || parsedBudget <= 0) {
+    if (
+      !Number.isFinite(parsedBudget) ||
+      parsedBudget <= 0
+    ) {
       return Response.json(
         {
           success: false,
@@ -204,7 +226,8 @@ export async function POST(request: Request) {
       return Response.json(
         {
           success: false,
-          message: "The end date cannot be before the start date.",
+          message:
+            "The end date cannot be before the start date.",
         },
         { status: 400 }
       );
@@ -213,6 +236,11 @@ export async function POST(request: Request) {
     const destinationNames = destinations
       .map((destination) => destination.name)
       .join(", ");
+
+    console.log(
+      "GENERATE TRIP: Building prompt for:",
+      destinationNames
+    );
 
     const prompt = buildTripPrompt({
       country,
@@ -227,19 +255,30 @@ export async function POST(request: Request) {
       weatherForecast: body.weatherForecast,
     });
 
-    /*
-      Generate the Gemini itinerary and fetch the destination image
-      at the same time to reduce the total response time.
-    */
+    console.log("GENERATE TRIP: Starting Gemini request.");
+
     const [itinerary, imageUrl] = await Promise.all([
       generateTrip(prompt),
-      getDestinationImage(destinations[0].name, country),
+      getDestinationImage(
+        destinations[0].name,
+        country
+      ),
     ]);
 
-    /*
-      The existing Prisma schema stores multiple destinations
-      inside the destination String field.
-    */
+    console.log(
+      "GENERATE TRIP: Gemini request completed."
+    );
+
+    if (!itinerary.trim()) {
+      throw new Error(
+        "Gemini returned an empty itinerary."
+      );
+    }
+
+    console.log(
+      "GENERATE TRIP: Saving trip to database."
+    );
+
     const savedTrip = await prisma.trip.create({
       data: {
         userId,
@@ -264,6 +303,11 @@ export async function POST(request: Request) {
       },
     });
 
+    console.log(
+      "GENERATE TRIP: Trip saved successfully:",
+      savedTrip.id
+    );
+
     return Response.json(
       {
         success: true,
@@ -273,14 +317,23 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("GENERATE TRIP API ERROR:", error);
+  } catch (error: unknown) {
+    console.error(
+      "GENERATE TRIP API ERROR:",
+      error
+    );
 
     const errorMessage = getErrorMessage(error);
-    const normalizedMessage = errorMessage.toLowerCase();
+    const normalizedMessage =
+      errorMessage.toLowerCase();
 
     if (
-      normalizedMessage.includes("invalid gemini api key") ||
+      normalizedMessage.includes(
+        "gemini_api_key is not configured"
+      ) ||
+      normalizedMessage.includes(
+        "invalid gemini api key"
+      ) ||
       normalizedMessage.includes("api key not valid") ||
       normalizedMessage.includes("api_key_invalid") ||
       normalizedMessage.includes("401")
@@ -289,7 +342,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            "The Gemini API key is invalid. Please check GEMINI_API_KEY in your environment variables.",
+            "The Gemini API key is invalid or missing. Check GEMINI_API_KEY in Vercel Environment Variables.",
         },
         { status: 401 }
       );
@@ -297,7 +350,9 @@ export async function POST(request: Request) {
 
     if (
       normalizedMessage.includes("access denied") ||
-      normalizedMessage.includes("permission denied") ||
+      normalizedMessage.includes(
+        "permission denied"
+      ) ||
       normalizedMessage.includes("forbidden") ||
       normalizedMessage.includes("403")
     ) {
@@ -313,7 +368,9 @@ export async function POST(request: Request) {
 
     if (
       normalizedMessage.includes("quota") ||
-      normalizedMessage.includes("resource_exhausted") ||
+      normalizedMessage.includes(
+        "resource_exhausted"
+      ) ||
       normalizedMessage.includes("rate limit") ||
       normalizedMessage.includes("429")
     ) {
@@ -321,7 +378,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            "The Gemini API quota has been reached. Please wait and try again or review your Gemini API quota.",
+            "The Gemini API quota has been reached. Please wait and try again or review the Gemini API quota.",
         },
         { status: 429 }
       );
@@ -355,10 +412,19 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+      Temporary debugging response.
+
+      This exposes the real server error so we can identify
+      whether Gemini, Prisma or another service is failing.
+
+      After the problem is fixed, replace errorMessage below
+      with a generic user-friendly message.
+    */
     return Response.json(
       {
         success: false,
-        message: "Unable to generate the itinerary. Please try again.",
+        message: errorMessage,
       },
       { status: 500 }
     );
