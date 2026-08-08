@@ -1,3 +1,9 @@
+export type TouristPlaceSource =
+  | "wikidata"
+  | "opentripmap"
+  | "photon"
+  | "manual";
+
 export type TouristPlace = {
   id: string;
   name: string;
@@ -11,7 +17,7 @@ export type TouristPlace = {
   imageUrl?: string;
   wikipediaUrl?: string;
   distanceKm?: number;
-  source: "wikidata" | "opentripmap";
+  source: TouristPlaceSource;
 };
 
 export type CountryOption = {
@@ -25,9 +31,14 @@ export function uniqueTouristPlaces(
   const seen = new Set<string>();
 
   return places.filter((place) => {
-    const key = `${place.name.toLowerCase()}-${place.latitude.toFixed(3)}-${place.longitude.toFixed(3)}`;
+    const key = `${place.name.toLowerCase()}-${place.latitude.toFixed(
+      3
+    )}-${place.longitude.toFixed(3)}`;
 
-    if (seen.has(key)) return false;
+    if (seen.has(key)) {
+      return false;
+    }
+
     seen.add(key);
     return true;
   });
