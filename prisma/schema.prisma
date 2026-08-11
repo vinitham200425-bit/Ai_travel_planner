@@ -32,7 +32,13 @@ model Trip {
 
   isFavorite Boolean @default(false)
 
+  isPublic  Boolean @default(false)
+  shareToken String? @unique
+
   createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model ContactMessage {

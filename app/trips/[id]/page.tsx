@@ -41,6 +41,8 @@ type Trip = {
   itinerary: string;
   imageUrl?: string | null;
   isFavorite?: boolean;
+  isPublic?: boolean;
+  shareToken?: string | null;
   createdAt: string;
 };
 
@@ -607,15 +609,38 @@ export default function TripDetailsPage() {
     try {
       setSharingTrip(true);
 
-      const shareUrl = window.location.href;
-      const shareTitle = `${trip.destination}, ${trip.country} Travel Plan`;
-      const shareText = `Check out my travel itinerary for ${trip.destination}, ${trip.country}.`;
+      const response = await fetch(
+        `/api/trips/${trip.id}/share`,
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
+
+      const data = (await response.json()) as {
+        success: boolean;
+        shareUrl?: string;
+        message?: string;
+      };
+
+      if (!response.ok || !data.success || !data.shareUrl) {
+        throw new Error(
+          data.message || "Unable to create a share link."
+        );
+      }
+
+      const shareTitle =
+        `${trip.destination}, ${trip.country} Travel Plan`;
+
+      const shareText =
+        `Check out my ${trip.days}-day travel itinerary for ` +
+        `${trip.destination}, ${trip.country} on AITrips.`;
 
       if (navigator.share) {
         await navigator.share({
           title: shareTitle,
           text: shareText,
-          url: shareUrl,
+          url: data.shareUrl,
         });
 
         toast.success("Trip shared successfully.");
@@ -624,14 +649,14 @@ export default function TripDetailsPage() {
 
       if (!navigator.clipboard) {
         throw new Error(
-          "Clipboard sharing is not supported."
+          "Sharing is not supported in this browser."
         );
       }
 
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(data.shareUrl);
 
       toast.success(
-        "Trip link copied to clipboard."
+        "Share link copied. You can paste it into any app."
       );
     } catch (error) {
       if (
@@ -642,7 +667,12 @@ export default function TripDetailsPage() {
       }
 
       console.error("Share trip error:", error);
-      toast.error("Unable to share the trip.");
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to share the trip."
+      );
     } finally {
       setSharingTrip(false);
     }
