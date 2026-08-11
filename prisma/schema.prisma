@@ -27,8 +27,7 @@ model Trip {
   hotelCategory String
 
   itinerary String
-
-  imageUrl String?
+  imageUrl  String?
 
   isFavorite Boolean @default(false)
 
@@ -36,9 +35,6 @@ model Trip {
   shareToken String? @unique
 
   createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([createdAt])
 }
 
 model ContactMessage {
