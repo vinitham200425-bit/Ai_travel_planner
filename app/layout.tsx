@@ -10,13 +10,12 @@ export const metadata: Metadata = {
   ),
 
   title: {
-    default: "AI Travel Planner | Create Personalized Trip Itineraries",
+    default:     "AI Travel Planner & Itinerary Generator | AITrips",
     template: "%s | AI Travel Planner",
   },
 
   description:
-    "Create personalized AI travel itineraries using your destination, dates, budget, travel style, weather forecast and nearby attractions.",
-
+    "Plan personalized trips with AITrips, an AI travel planner and itinerary generator. Create day-by-day travel itineraries based on your destination, budget, travel style and trip duration.",
   keywords: [
     "AI travel planner",
     "trip planner",
@@ -26,6 +25,9 @@ export const metadata: Metadata = {
     "holiday planner",
     "budget trip planner",
     "travel planner India",
+    "ai generated travel itinerary",
+    "ai travel itineraries",
+    "ai generated itineraries"
   ],
 
   authors: [
