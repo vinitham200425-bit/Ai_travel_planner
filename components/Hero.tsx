@@ -17,13 +17,13 @@ export default function Hero() {
       className="relative isolate flex min-h-[720px] scroll-mt-20 items-center overflow-hidden pt-20"
     >
       <Image
-  src="/images/travel-collage-v2.png"
-  alt="Collage of famous travel destinations around the world"
-  fill
-  priority
-  sizes="100vw"
-  className="object-cover object-center"
-/>
+        src="/images/travel-collage-v2.png"
+        alt="Collage of famous travel destinations around the world"
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
+      />
 
       <div className="absolute inset-0 bg-gradient-to-r from-gray-950/90 via-gray-950/65 to-gray-950/25" />
 
@@ -35,12 +35,12 @@ export default function Hero() {
           </div>
 
           <h1 className="text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-7xl">
-            Plan your perfect trip in minutes
+            AI Travel Planner for Personalized Itineraries
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-200 sm:text-xl">
-            Create a personalized itinerary based on your destination,
-            travel dates, budget, preferences and weather conditions.
+            Create a complete day-by-day travel itinerary based on your
+            destination, budget, dates and travel style.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-4">
